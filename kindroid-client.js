@@ -116,6 +116,8 @@ class KindroidClient {
                                         fullAccumulated += parsed.message;
                                         // Update the script area with latest content
                                         this.updateScriptArea(fullAccumulated);
+                                        // Try to incrementally update the story display
+                                        this.tryIncrementalUpdate(fullAccumulated);
                                         console.log('📝 Added chunk, total length:', fullAccumulated.length);
                                         break;
                                         
@@ -195,6 +197,14 @@ class KindroidClient {
                     setTimeout(() => {
                         this.autoAdvanceToFirstContent();
                     }, 100);
+                    
+                    // Show streaming indicator in dialogue
+                    setTimeout(() => {
+                        if (window.game.dialogueText) {
+                            window.game.dialogueText.textContent = 'AI is generating your story...';
+                            window.game.characterName.textContent = 'Kindroid AI';
+                        }
+                    }, 200);
                 } catch (error) {
                     console.error('Failed to load partial story:', error);
                 }
@@ -207,6 +217,29 @@ class KindroidClient {
         const scriptArea = document.getElementById('script-area');
         if (scriptArea) {
             scriptArea.value = fullMessage;
+        }
+    }
+
+    tryIncrementalUpdate(currentText) {
+        // Show live preview of streaming text in dialogue box
+        if (window.game && window.game.dialogueText && currentText.length > 50) {
+            // Extract the latest readable content to show as preview
+            const lines = currentText.split('\n');
+            const textLines = lines.filter(line => 
+                !line.startsWith('LOC:') && 
+                !line.startsWith('CHA:') && 
+                !line.startsWith('STP:') &&
+                !line.includes(':') && // Skip dialogue lines for now
+                line.trim().length > 10
+            );
+            
+            if (textLines.length > 0) {
+                const previewText = textLines[textLines.length - 1].trim();
+                if (previewText.length > 10) {
+                    window.game.dialogueText.textContent = `📝 ${previewText}...`;
+                    window.game.characterName.textContent = 'AI Writing';
+                }
+            }
         }
     }
 
