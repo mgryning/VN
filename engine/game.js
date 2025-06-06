@@ -251,7 +251,7 @@ class VisualNovelEngine {
     }
     
     handleKeyPress(e) {
-        if (e.target.tagName === 'TEXTAREA') return;
+        if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
         
         // Only allow manual controls when not streaming
         if (!this.streaming) {

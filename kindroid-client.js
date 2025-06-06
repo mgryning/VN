@@ -8,10 +8,8 @@ class KindroidClient {
         
         if (!this.isTestMode && typeof window !== 'undefined') {
             this.setupUI();
-            // Create persistent input panel
-            setTimeout(() => {
-                this.createPersistentInputPanel();
-            }, 1000);
+            // Create persistent input panel immediately
+            this.createPersistentInputPanel();
             // Add temporary test buttons after a short delay  
             setTimeout(() => {
                 this.createTestStpOptions();
