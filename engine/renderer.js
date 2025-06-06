@@ -13,6 +13,7 @@ class Renderer {
         this.backgrounds = new Map();
         this.characters = new Map();
         this.loadedImages = new Map();
+        this.missingFiles = new Set(); // Track missing files to avoid duplicate logs
         
         this.setupCanvas();
         this.bindEvents();
@@ -246,8 +247,17 @@ class Renderer {
             }
         }
         
+        // Log missing background file only once
+        const missingKey = `bg_${locationName.toLowerCase()}`;
+        if (!this.missingFiles.has(missingKey)) {
+            this.missingFiles.add(missingKey);
+            // Don't await to avoid blocking rendering
+            this.logMissingFile('background', locationName).catch(err => 
+                console.warn('Failed to log missing background:', err)
+            );
+        }
+        
         // Fallback to gradient background if no image found
-        console.log(`⚠️ No background PNG found for '${locationName}', using gradient fallback`);
         const colors = this.getBackgroundColorsForLocation(locationName);
         return this.createGradientBackground(colors);
     }
@@ -389,25 +399,91 @@ class Renderer {
     }
     
     async createCharacter(name, mood) {
-        // Try to load character image from resources folder first
-        const possiblePaths = [
-            `resources/characters/${name.toLowerCase()}_${mood.toLowerCase()}.png`,
-            `resources/characters/${name.toLowerCase()}.png`
-        ];
-        
-        for (const imagePath of possiblePaths) {
-            try {
-                const img = await this.loadImage(imagePath);
-                console.log(`✅ Loaded character image: ${imagePath}`);
-                return this.createCharacterImage(img);
-            } catch (error) {
-                // Image not found, try next path
+        // First try to load specific mood image
+        const specificPath = `resources/characters/${name.toLowerCase()}_${mood.toLowerCase()}.png`;
+        try {
+            const img = await this.loadImage(specificPath);
+            console.log(`✅ Loaded character image: ${specificPath}`);
+            return this.createCharacterImage(img);
+        } catch (error) {
+            // Specific mood image not found, log it
+            const missingKey = `${name.toLowerCase()}_${mood.toLowerCase()}`;
+            if (!this.missingFiles.has(missingKey)) {
+                this.missingFiles.add(missingKey);
+                // Don't await to avoid blocking rendering
+                this.logMissingFile('character', name, mood).catch(err => 
+                    console.warn('Failed to log missing character:', err)
+                );
             }
         }
         
-        // Fallback to placeholder if no image found
-        console.log(`⚠️ No character PNG found for '${name}/${mood}', using placeholder`);
-        return this.createCharacterPlaceholder(name, mood);
+        // Try fallback to general character image
+        const generalPath = `resources/characters/${name.toLowerCase()}.png`;
+        try {
+            const img = await this.loadImage(generalPath);
+            console.log(`✅ Loaded fallback character image: ${generalPath}`);
+            return this.createCharacterImage(img);
+        } catch (error) {
+            // No character image at all, use placeholder
+            return this.createCharacterPlaceholder(name, mood);
+        }
+    }
+
+    async logMissingFile(type, name, mood = null) {
+        const timestamp = new Date().toISOString();
+        const filename = mood ? 
+            `${name.toLowerCase()}_${mood.toLowerCase()}.png` : 
+            `${name.toLowerCase()}.png`;
+        
+        const logEntry = `[${timestamp}] Missing ${type}: resources/${type}s/${filename}`;
+        
+        // Log to console
+        console.warn(`📝 ${logEntry}`);
+        
+        // Store locally
+        if (!window.missingAssets) {
+            window.missingAssets = [];
+        }
+        const assetInfo = {
+            timestamp,
+            type,
+            name: name.toLowerCase(),
+            mood: mood?.toLowerCase(),
+            filename,
+            path: `resources/${type}s/${filename}`
+        };
+        window.missingAssets.push(assetInfo);
+        
+        // Persist to server file
+        try {
+            await fetch('/api/log-missing-asset', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(assetInfo)
+            });
+        } catch (error) {
+            console.warn('Failed to persist missing asset log:', error);
+        }
+    }
+
+    // Helper function to export missing assets log
+    static exportMissingAssets() {
+        if (!window.missingAssets || window.missingAssets.length === 0) {
+            console.log('📋 No missing assets to export');
+            return;
+        }
+        
+        const logContent = window.missingAssets
+            .map(asset => `${asset.timestamp} - ${asset.path}`)
+            .join('\n');
+        
+        console.log('📋 Missing Assets Report:');
+        console.log(logContent);
+        
+        // Also return the structured data
+        return window.missingAssets;
     }
     
     createCharacterImage(img) {

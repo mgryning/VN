@@ -1,0 +1,18 @@
+[
+  {
+    "timestamp": "2025-06-06T12:06:25.890Z",
+    "type": "character",
+    "name": "ava",
+    "mood": "surprised",
+    "filename": "ava_surprised.png",
+    "path": "resources/characters/ava_surprised.png"
+  },
+  {
+    "timestamp": "2025-06-06T12:22:36.861Z",
+    "type": "character",
+    "name": "ava",
+    "mood": "flustered",
+    "filename": "ava_flustered.png",
+    "path": "resources/characters/ava_flustered.png"
+  }
+]

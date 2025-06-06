@@ -8,6 +8,8 @@ require('dotenv').config();
 
 const aiRoutes = require('./routes/ai');
 const storyRoutes = require('./routes/story');
+const assetRoutes = require('./routes/assets');
+const kindroidRoutes = require('./routes/kindroid');
 
 const app = express();
 
@@ -41,6 +43,8 @@ app.use(express.static(path.join(__dirname, '..')));
 
 app.use('/api/ai', aiRoutes);
 app.use('/api/story', storyRoutes);
+app.use('/api/kindroid', kindroidRoutes);
+app.use('/api', assetRoutes);
 
 app.get('/api/health', (req, res) => {
     res.json({ 
