@@ -77,26 +77,46 @@ class Scene {
     }
     
     async renderScene() {
-        this.renderer.clear();
-        
-        if (this.currentLocation) {
-            await this.renderer.drawBackground(this.currentLocation);
-        }
-        
-        if (this.currentCharacters && this.currentCharacters.length > 0) {
-            await this.positionAndDrawCharacters();
-        }
+        // Use double buffering to prevent flicker
+        await this.renderer.renderSceneToBuffer(async () => {
+            if (this.currentLocation) {
+                await this.renderer.drawBackground(this.currentLocation);
+            }
+            
+            if (this.currentCharacters && this.currentCharacters.length > 0) {
+                await this.positionAndDrawCharacters();
+            }
+        });
     }
     
     async positionAndDrawCharacters() {
         const positions = this.calculateCharacterPositions(this.currentCharacters.length);
         
-        // Draw characters sequentially to avoid conflicts
+        // Draw characters sequentially - double buffering handles smooth transitions
         for (let i = 0; i < this.currentCharacters.length; i++) {
             const character = this.currentCharacters[i];
             const position = positions[i];
             await this.renderer.drawCharacter(character.name, character.mood, position);
         }
+        
+        // Store current character states for next comparison
+        this.storeCharacterStates();
+    }
+    
+    getPreviousMood(characterName) {
+        if (!this.previousCharacterStates) return null;
+        
+        const previous = this.previousCharacterStates.find(prev => 
+            prev.name.toLowerCase() === characterName.toLowerCase()
+        );
+        return previous ? previous.mood : null;
+    }
+    
+    storeCharacterStates() {
+        this.previousCharacterStates = this.currentCharacters.map(char => ({
+            name: char.name,
+            mood: char.mood
+        }));
     }
     
     calculateCharacterPositions(count) {

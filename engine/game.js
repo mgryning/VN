@@ -124,7 +124,7 @@ class VisualNovelEngine {
         } else if (this.currentCommand.type === 'characters') {
             // Character-only commands (mood changes) should auto-advance
             // since they don't provide new story content
-            setTimeout(() => this.nextCommand(), 100);
+            this.nextCommand();
         } else {
             if (this.autoMode) {
                 setTimeout(() => this.nextCommand(), 1000);

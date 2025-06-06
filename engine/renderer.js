@@ -6,6 +6,10 @@ class Renderer {
         this.height = 0; // Will be set by updateCanvasSize
         this.scale = 1;
         
+        // Create off-screen canvas for double buffering
+        this.offscreenCanvas = document.createElement('canvas');
+        this.offscreenCtx = this.offscreenCanvas.getContext('2d');
+        
         this.backgrounds = new Map();
         this.characters = new Map();
         this.loadedImages = new Map();
@@ -33,6 +37,12 @@ class Renderer {
         this.canvas.height = this.height;
         this.canvas.style.width = this.width + 'px';
         this.canvas.style.height = this.height + 'px';
+        
+        // Update offscreen canvas size to match
+        this.offscreenCanvas.width = this.width;
+        this.offscreenCanvas.height = this.height;
+        this.offscreenCtx.imageSmoothingEnabled = true;
+        this.offscreenCtx.imageSmoothingQuality = 'high';
         
         this.scale = 1;
     }
@@ -174,6 +184,37 @@ class Renderer {
     
     clear() {
         this.ctx.clearRect(0, 0, this.width, this.height);
+        this.offscreenCtx.clearRect(0, 0, this.width, this.height);
+    }
+    
+    // Method to render entire scene to offscreen canvas, then copy to main canvas
+    renderSceneToBuffer(renderFunction) {
+        return new Promise(async (resolve) => {
+            // Clear offscreen canvas
+            this.offscreenCtx.clearRect(0, 0, this.width, this.height);
+            
+            // Temporarily redirect drawing context to offscreen canvas
+            const originalCtx = this.ctx;
+            this.ctx = this.offscreenCtx;
+            
+            try {
+                // Execute the render function on offscreen canvas
+                await renderFunction();
+                
+                // Restore original context
+                this.ctx = originalCtx;
+                
+                // Copy offscreen canvas to main canvas in one operation
+                this.ctx.clearRect(0, 0, this.width, this.height);
+                this.ctx.drawImage(this.offscreenCanvas, 0, 0);
+                
+                resolve();
+            } catch (error) {
+                // Restore context even if there's an error
+                this.ctx = originalCtx;
+                throw error;
+            }
+        });
     }
     
     async drawBackground(backgroundKey) {
@@ -294,6 +335,56 @@ class Renderer {
         this.ctx.save();
         this.ctx.globalAlpha = 1.0;
         this.ctx.drawImage(character, x, y, charWidth, charHeight);
+        this.ctx.restore();
+    }
+    
+    async drawCharacterWithTransition(name, oldMood, newMood, position = 'center') {
+        const oldKey = `${name}_${oldMood}`;
+        const newKey = `${name}_${newMood}`;
+        
+        let oldCharacter = this.characters.get(oldKey);
+        let newCharacter = this.characters.get(newKey);
+        
+        if (!newCharacter) {
+            newCharacter = await this.createCharacter(name, newMood);
+            this.characters.set(newKey, newCharacter);
+        }
+        
+        const charWidth = newCharacter.width;
+        const charHeight = newCharacter.height;
+        
+        let x;
+        switch (position) {
+            case 'left':
+                x = this.width * 0.2 - charWidth / 2;
+                break;
+            case 'right':
+                x = this.width * 0.8 - charWidth / 2;
+                break;
+            case 'center':
+            default:
+                x = this.width / 2 - charWidth / 2;
+                break;
+        }
+        
+        // Calculate position same as regular drawCharacter
+        const dialogueBoxBottomMargin = 20;
+        const estimatedDialogueHeight = 120;
+        const dialogueBoxTop = this.height - dialogueBoxBottomMargin - estimatedDialogueHeight;
+        const y = dialogueBoxTop - charHeight;
+        
+        this.ctx.save();
+        
+        // Draw the old character with reduced opacity (fade out)
+        if (oldCharacter) {
+            this.ctx.globalAlpha = 0.4;
+            this.ctx.drawImage(oldCharacter, x, y, charWidth, charHeight);
+        }
+        
+        // Draw the new character with higher opacity (fade in)
+        this.ctx.globalAlpha = 0.8;
+        this.ctx.drawImage(newCharacter, x, y, charWidth, charHeight);
+        
         this.ctx.restore();
     }
     
