@@ -192,7 +192,7 @@ class KindroidClient {
                                                 const postStpText = stpMatch[1];
                                                 this.streamAccumulator = postStpText;
                                                 this.updateStreamedText();
-                                                return; // Skip processing this chunk as script
+                                                // Continue processing - don't return early
                                             } else if (!hasVNFormat && fullAccumulated.trim().length > 50) {
                                                 // Regular text format - treat entire content as story
                                                 this.sceneSetupComplete = true;
@@ -206,7 +206,7 @@ class KindroidClient {
                                                 
                                                 this.streamAccumulator = fullAccumulated;
                                                 this.updateStreamedText();
-                                                return;
+                                                // Continue processing - don't return early
                                             }
                                         }
                                         
