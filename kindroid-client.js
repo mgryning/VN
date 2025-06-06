@@ -1,6 +1,8 @@
 class KindroidClient {
     constructor() {
         this.baseURL = window.location.origin;
+        this.streamAccumulator = '';
+        this.sceneSetupComplete = false;
         this.setupUI();
     }
 
@@ -50,10 +52,12 @@ class KindroidClient {
         const originalText = button.textContent;
         
         try {
-            // Update button state
+            // Update button state and reset state
             button.textContent = 'Streaming Story...';
             button.disabled = true;
             button.style.background = '#9ca3af';
+            this.streamAccumulator = '';
+            this.sceneSetupComplete = false;
 
             // Set up fetch with streaming
             const response = await fetch(`${this.baseURL}/api/kindroid/repeat-previous`, {
@@ -74,7 +78,6 @@ class KindroidClient {
             let fullAccumulated = '';
             let hasStartedDisplay = false;
             let lineBuffer = ''; // Buffer for incomplete lines
-            let sceneSetupComplete = false; // Track when we're past setup and should stream directly
 
             const processStream = async () => {
                 try {
@@ -126,29 +129,38 @@ class KindroidClient {
                                         break;
                                         
                                     case 'chunk':
+                                        console.log('🔄 Processing chunk:', JSON.stringify(parsed.message), 'Setup complete:', this.sceneSetupComplete);
                                         fullAccumulated += parsed.message;
                                         // Update the script area with latest content
                                         this.updateScriptArea(fullAccumulated);
                                         
                                         // Check if we've completed scene setup (past LOC, CHA, STP)
-                                        if (!sceneSetupComplete && hasStartedDisplay) {
-                                            // Look for text that comes after STP line
+                                        if (!this.sceneSetupComplete && hasStartedDisplay) {
+                                            // Look for text that comes after STP line - need meaningful content
                                             const stpMatch = fullAccumulated.match(/STP:.*?\n(.*)$/s);
-                                            if (stpMatch && stpMatch[1].trim().length > 0) {
-                                                sceneSetupComplete = true;
+                                            if (stpMatch && stpMatch[1].trim().length > 10) { // Need more than just a few characters
+                                                this.sceneSetupComplete = true;
                                                 console.log('🎭 Scene setup complete, switching to direct text streaming');
+                                                console.log('📄 Text after STP:', JSON.stringify(stpMatch[1]));
                                                 // Clear any setup parsing and prepare for direct streaming
                                                 if (window.game) {
                                                     window.game.characterName.textContent = 'Story';
                                                     window.game.dialogueText.textContent = '';
                                                     window.game.hideContinueIndicator();
                                                 }
+                                                // Extract text after STP and set as initial content
+                                                const postStpText = stpMatch[1];
+                                                this.streamAccumulator = postStpText;
+                                                this.updateStreamedText();
+                                                return; // Skip processing this chunk as script
                                             }
                                         }
                                         
-                                        if (sceneSetupComplete) {
-                                            // Stream text directly to dialogue box after setup
-                                            this.streamToDialogueBox(parsed.message);
+                                        if (this.sceneSetupComplete) {
+                                            // Accumulate streaming text and update display
+                                            console.log('📺 Streaming mode - adding to accumulator:', JSON.stringify(parsed.message));
+                                            this.streamAccumulator = (this.streamAccumulator || '') + parsed.message;
+                                            this.updateStreamedText();
                                         } else {
                                             // Still in setup phase - process as script commands
                                             // Buffer chunks until we have complete lines
@@ -219,7 +231,6 @@ class KindroidClient {
         }
     }
 
-
     updateScriptArea(fullMessage) {
         // Update the script area with the latest content
         const scriptArea = document.getElementById('script-area');
@@ -228,45 +239,23 @@ class KindroidClient {
         }
     }
 
-    streamToDialogueBox(chunk) {
-        // Stream text directly to the dialogue box with typewriter effect
-        if (window.game && window.game.dialogueText) {
-            // Cancel any existing typewriter effect
+    updateStreamedText() {
+        // Update the dialogue box with accumulated streaming text
+        if (window.game && window.game.dialogueText && this.streamAccumulator) {
+            // Cancel any existing typewriter effects
             if (window.game.typewriterInterval) {
                 clearInterval(window.game.typewriterInterval);
                 window.game.typewriterInterval = null;
             }
-            
-            // Append the chunk and start typewriter effect for new text
-            const currentText = window.game.dialogueText.textContent;
-            const newText = currentText + chunk;
-            
-            // Use a custom streaming typewriter that doesn't interfere with game state
-            this.typeStreamedText(newText, currentText.length);
-            console.log('📺 Streaming to dialogue:', chunk);
-        }
-    }
-
-    typeStreamedText(fullText, startIndex) {
-        if (!window.game || !window.game.dialogueText) return;
-        
-        const textElement = window.game.dialogueText;
-        let currentIndex = startIndex;
-        
-        // Clear any existing interval
-        if (this.streamTypewriterInterval) {
-            clearInterval(this.streamTypewriterInterval);
-        }
-        
-        this.streamTypewriterInterval = setInterval(() => {
-            if (currentIndex < fullText.length) {
-                textElement.textContent = fullText.substring(0, currentIndex + 1);
-                currentIndex++;
-            } else {
+            if (this.streamTypewriterInterval) {
                 clearInterval(this.streamTypewriterInterval);
                 this.streamTypewriterInterval = null;
             }
-        }, 30); // Faster for streaming
+            
+            // Set text directly without typewriter effect for smoother streaming
+            window.game.dialogueText.textContent = this.streamAccumulator;
+            console.log('📺 Updated streaming text, length:', this.streamAccumulator.length);
+        }
     }
 
     tryIncrementalUpdate(currentText) {

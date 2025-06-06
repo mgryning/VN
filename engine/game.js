@@ -202,7 +202,11 @@ class VisualNovelEngine {
         if (this.parser.hasNext()) {
             this.parser.getNextCommand();
             this.executeCurrentCommand();
-        }
+        } else if (this.streaming) {
+        // <-- NEW: we ran out of commands but Kindroid is still streaming
+        // Flag that we're waiting, so resumeFromWaiting() will restart playback
+        this.waitingMore = true;
+    }
     }
     
     previousCommand() {

@@ -132,7 +132,7 @@ router.post('/repeat-previous', async (req, res) => {
             if (!hasInitialSetup && hasBasicSetup(accumulatedText)) {
                 hasInitialSetup = true;
                 console.log('✅ Setup ready detected, sending to client');
-                res.write(`event: setup_ready\ndata: ${JSON.stringify({ 
+                res.write(`data: ${JSON.stringify({ 
                     type: 'setup_ready', 
                     message: accumulatedText 
                 })}\n\n`);
@@ -140,7 +140,7 @@ router.post('/repeat-previous', async (req, res) => {
             }
             
             // Forward every chunk that arrives
-            res.write(`event: chunk\ndata: ${JSON.stringify({ 
+            res.write(`data: ${JSON.stringify({ 
                 type: 'chunk', 
                 message: chunkStr 
             })}\n\n`);
@@ -149,7 +149,7 @@ router.post('/repeat-previous', async (req, res) => {
 
         response.data.on('end', () => {
             console.log('✅ Stream ended, sending final message');
-            res.write(`event: done\ndata: ${JSON.stringify({ 
+            res.write(`data: ${JSON.stringify({ 
                 type: 'done', 
                 message: accumulatedText 
             })}\n\n`);
@@ -158,7 +158,7 @@ router.post('/repeat-previous', async (req, res) => {
 
         response.data.on('error', (error) => {
             console.error('Streaming error:', error);
-            res.write(`event: error\ndata: ${JSON.stringify({ 
+            res.write(`data: ${JSON.stringify({ 
                 type: 'error', 
                 error: error.message 
             })}\n\n`);
@@ -195,6 +195,12 @@ function hasBasicSetup(text) {
     const hasStp = stpMatch && stpMatch[1].trim().length > 0;
     
     console.log('Setup check:', { hasLoc, hasCha, hasStp, textLength: text.length });
+    if (hasLoc && hasCha && hasStp) {
+        console.log('✅ All setup components found:');
+        console.log('LOC match:', locMatch[1]);
+        console.log('CHA match:', chaMatch[1]);
+        console.log('STP match:', stpMatch[1]);
+    }
     
     // We need LOC, CHA, and STP with actual content to start
     return hasLoc && hasCha && hasStp;
