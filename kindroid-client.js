@@ -74,6 +74,7 @@ class KindroidClient {
             let fullAccumulated = '';
             let hasStartedDisplay = false;
             let lineBuffer = ''; // Buffer for incomplete lines
+            let sceneSetupComplete = false; // Track when we're past setup and should stream directly
 
             const processStream = async () => {
                 try {
@@ -129,20 +130,42 @@ class KindroidClient {
                                         // Update the script area with latest content
                                         this.updateScriptArea(fullAccumulated);
                                         
-                                        // Buffer chunks until we have complete lines
-                                        lineBuffer += parsed.message;
-                                        const parts = lineBuffer.split('\n');
+                                        // Check if we've completed scene setup (past LOC, CHA, STP)
+                                        if (!sceneSetupComplete && hasStartedDisplay) {
+                                            // Look for text that comes after STP line
+                                            const stpMatch = fullAccumulated.match(/STP:.*?\n(.*)$/s);
+                                            if (stpMatch && stpMatch[1].trim().length > 0) {
+                                                sceneSetupComplete = true;
+                                                console.log('🎭 Scene setup complete, switching to direct text streaming');
+                                                // Clear any setup parsing and prepare for direct streaming
+                                                if (window.game) {
+                                                    window.game.characterName.textContent = 'Story';
+                                                    window.game.dialogueText.textContent = '';
+                                                    window.game.hideContinueIndicator();
+                                                }
+                                            }
+                                        }
                                         
-                                        // Everything except the last element is a complete line
-                                        const completeLines = parts.slice(0, -1).join('\n');
-                                        // Keep the last part (might be incomplete) for next chunk
-                                        lineBuffer = parts[parts.length - 1];
-                                        
-                                        // Only send complete lines to the game engine
-                                        if (completeLines.length > 0 && window.game) {
-                                            console.log('📝 Adding complete lines:', completeLines);
-                                            window.game.loadScript(completeLines + '\n', { append: true });
-                                            window.game.resumeFromWaiting();
+                                        if (sceneSetupComplete) {
+                                            // Stream text directly to dialogue box after setup
+                                            this.streamToDialogueBox(parsed.message);
+                                        } else {
+                                            // Still in setup phase - process as script commands
+                                            // Buffer chunks until we have complete lines
+                                            lineBuffer += parsed.message;
+                                            const parts = lineBuffer.split('\n');
+                                            
+                                            // Everything except the last element is a complete line
+                                            const completeLines = parts.slice(0, -1).join('\n');
+                                            // Keep the last part (might be incomplete) for next chunk
+                                            lineBuffer = parts[parts.length - 1];
+                                            
+                                            // Only send complete lines to the game engine
+                                            if (completeLines.length > 0 && window.game) {
+                                                console.log('📝 Adding complete lines:', completeLines);
+                                                window.game.loadScript(completeLines + '\n', { append: true });
+                                                window.game.resumeFromWaiting();
+                                            }
                                         }
                                         
                                         console.log('📝 Added chunk, total length:', fullAccumulated.length);
@@ -203,6 +226,47 @@ class KindroidClient {
         if (scriptArea) {
             scriptArea.value = fullMessage;
         }
+    }
+
+    streamToDialogueBox(chunk) {
+        // Stream text directly to the dialogue box with typewriter effect
+        if (window.game && window.game.dialogueText) {
+            // Cancel any existing typewriter effect
+            if (window.game.typewriterInterval) {
+                clearInterval(window.game.typewriterInterval);
+                window.game.typewriterInterval = null;
+            }
+            
+            // Append the chunk and start typewriter effect for new text
+            const currentText = window.game.dialogueText.textContent;
+            const newText = currentText + chunk;
+            
+            // Use a custom streaming typewriter that doesn't interfere with game state
+            this.typeStreamedText(newText, currentText.length);
+            console.log('📺 Streaming to dialogue:', chunk);
+        }
+    }
+
+    typeStreamedText(fullText, startIndex) {
+        if (!window.game || !window.game.dialogueText) return;
+        
+        const textElement = window.game.dialogueText;
+        let currentIndex = startIndex;
+        
+        // Clear any existing interval
+        if (this.streamTypewriterInterval) {
+            clearInterval(this.streamTypewriterInterval);
+        }
+        
+        this.streamTypewriterInterval = setInterval(() => {
+            if (currentIndex < fullText.length) {
+                textElement.textContent = fullText.substring(0, currentIndex + 1);
+                currentIndex++;
+            } else {
+                clearInterval(this.streamTypewriterInterval);
+                this.streamTypewriterInterval = null;
+            }
+        }, 30); // Faster for streaming
     }
 
     tryIncrementalUpdate(currentText) {
