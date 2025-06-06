@@ -266,13 +266,7 @@ class KindroidClient {
                                         // Update script area and end streaming mode
                                         this.updateScriptArea(fullAccumulated);
                                         
-                                        // Flush any remaining content in the line buffer
-                                        if (lineBuffer.trim().length > 0 && window.game) {
-                                            console.log('📝 Flushing final content:', lineBuffer);
-                                            window.game.loadScript(lineBuffer + '\n', { append: true });
-                                            lineBuffer = '';
-                                        }
-                                        
+                                        // End streaming mode without flushing line buffer to preserve streamed content
                                         if (window.game) {
                                             window.game.streaming = false;
                                             window.game.resumeFromWaiting();
