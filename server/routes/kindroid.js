@@ -86,15 +86,19 @@ router.post('/repeat-previous', async (req, res) => {
             stream: true
         });
         
-        // Set up streaming response
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-        res.setHeader('Access-Control-Allow-Methods', 'POST');
+        // 1. Send headers and flush them immediately
+        res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Allow-Methods': 'POST',
+            'Transfer-Encoding': 'chunked'
+        });
+        res.flushHeaders(); // Very important!
         
-        // Send streaming request to Kindroid AI
+        // 2. Start upstream streaming request
         const response = await axios.post(`${KINDROID_API_URL}/send-message`, {
             ai_id: KINDROID_AI_ID,
             message: message,
@@ -119,84 +123,46 @@ router.post('/repeat-previous', async (req, res) => {
 
         response.data.on('data', (chunk) => {
             const chunkStr = chunk.toString();
-            console.log('Received chunk:', chunkStr);
+            console.log('Received chunk:', JSON.stringify(chunkStr));
             
-            const lines = chunkStr.split('\n');
+            accumulatedText += chunkStr;
+            console.log('Accumulated so far:', accumulatedText.length, 'chars');
             
-            for (const line of lines) {
-                if (line.trim() === '') continue;
-                
-                if (line.startsWith('data: ')) {
-                    const data = line.substring(6).trim();
-                    
-                    if (data === '[DONE]') {
-                        res.write(`data: ${JSON.stringify({ type: 'done', message: accumulatedText })}\n\n`);
-                        res.end();
-                        return;
-                    }
-                    
-                    try {
-                        const parsed = JSON.parse(data);
-                        
-                        // Handle different response formats
-                        let messageChunk = '';
-                        if (parsed.message) {
-                            messageChunk = parsed.message;
-                        } else if (parsed.delta && parsed.delta.content) {
-                            messageChunk = parsed.delta.content;
-                        } else if (typeof parsed === 'string') {
-                            messageChunk = parsed;
-                        }
-                        
-                        if (messageChunk) {
-                            accumulatedText += messageChunk;
-                            
-                            // Check if we have basic setup (LOC/CHA/STP)
-                            if (!hasInitialSetup && hasBasicSetup(accumulatedText)) {
-                                hasInitialSetup = true;
-                                res.write(`data: ${JSON.stringify({ 
-                                    type: 'setup_ready', 
-                                    message: accumulatedText 
-                                })}\n\n`);
-                            }
-                            
-                            // Send chunk update
-                            res.write(`data: ${JSON.stringify({ 
-                                type: 'chunk', 
-                                message: accumulatedText 
-                            })}\n\n`);
-                        }
-                    } catch (parseError) {
-                        console.warn('Failed to parse streaming data:', data, parseError.message);
-                        // If it's not JSON, treat it as raw text
-                        if (data && data !== '[DONE]') {
-                            accumulatedText += data;
-                            res.write(`data: ${JSON.stringify({ 
-                                type: 'chunk', 
-                                message: accumulatedText 
-                            })}\n\n`);
-                        }
-                    }
-                } else if (line.trim()) {
-                    // Handle lines that don't start with 'data: '
-                    console.log('Non-data line:', line);
-                }
+            // Send setup_ready once
+            if (!hasInitialSetup && hasBasicSetup(accumulatedText)) {
+                hasInitialSetup = true;
+                console.log('✅ Setup ready detected, sending to client');
+                res.write(`event: setup_ready\ndata: ${JSON.stringify({ 
+                    type: 'setup_ready', 
+                    message: accumulatedText 
+                })}\n\n`);
+                if (res.flush) res.flush(); // Force over the wire
             }
+            
+            // Forward every chunk that arrives
+            res.write(`event: chunk\ndata: ${JSON.stringify({ 
+                type: 'chunk', 
+                message: chunkStr 
+            })}\n\n`);
+            if (res.flush) res.flush(); // Force over the wire
         });
 
         response.data.on('end', () => {
-            if (!res.headersSent) {
-                res.write(`data: ${JSON.stringify({ type: 'done', message: accumulatedText })}\n\n`);
-                res.end();
-            }
+            console.log('✅ Stream ended, sending final message');
+            res.write(`event: done\ndata: ${JSON.stringify({ 
+                type: 'done', 
+                message: accumulatedText 
+            })}\n\n`);
+            res.end(); // Always finish the response
         });
 
         response.data.on('error', (error) => {
             console.error('Streaming error:', error);
-            if (!res.headersSent) {
-                res.write(`data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`);
-                res.end();
-            }
+            res.write(`event: error\ndata: ${JSON.stringify({ 
+                type: 'error', 
+                error: error.message 
+            })}\n\n`);
+            res.end(); // Always finish the response
         });
 
     } catch (error) {
@@ -222,8 +188,12 @@ function hasBasicSetup(text) {
     const hasCha = text.includes('CHA:');
     const hasStp = text.includes('STP:');
     
+    console.log('Setup check:', { hasLoc, hasCha, hasStp, textLength: text.length });
+    
     // We need at least LOC and either CHA or STP to start
-    return hasLoc && (hasCha || hasStp);
+    // Also check we have some content after the setup
+    const hasContent = text.length > 20; // Basic sanity check
+    return hasLoc && (hasCha || hasStp) && hasContent;
 }
 
 module.exports = router;

@@ -69,7 +69,9 @@ class KindroidClient {
             }
 
             const reader = response.body.getReader();
-            let fullMessage = '';
+            const decoder = new TextDecoder();
+            let pending = '';
+            let fullAccumulated = '';
             let hasStartedDisplay = false;
 
             const processStream = async () => {
@@ -79,48 +81,56 @@ class KindroidClient {
                         
                         if (done) break;
                         
-                        const chunk = new TextDecoder().decode(value);
-                        const lines = chunk.split('\n');
+                        pending += decoder.decode(value, { stream: true });
                         
-                        for (const line of lines) {
-                            if (line.startsWith('data: ')) {
-                                const data = line.substring(6);
-                                if (data === '[DONE]') {
-                                    return;
-                                }
+                        // Handle every complete \n\n block we have
+                        let idx;
+                        while ((idx = pending.indexOf('\n\n')) !== -1) {
+                            const raw = pending.slice(0, idx).trim();
+                            pending = pending.slice(idx + 2);
+                            
+                            // Optional "event: ..." line
+                            const payloadLine = raw.replace(/^event:.*\n?/, '');
+                            const data = payloadLine.replace(/^data:\s*/, '');
+                            
+                            if (!data) continue;
+                            
+                            try {
+                                const parsed = JSON.parse(data);
+                                console.log('📨 Received event:', parsed.type, 'Content length:', parsed.message?.length || 0);
                                 
-                                try {
-                                    const parsed = JSON.parse(data);
-                                    
-                                    switch (parsed.type) {
-                                        case 'setup_ready':
-                                            // We have LOC/CHA/STP - start displaying immediately
-                                            if (!hasStartedDisplay) {
-                                                hasStartedDisplay = true;
-                                                button.textContent = 'Loading Scene...';
-                                                this.parseAndLoadStoryPartial(parsed.message);
-                                                this.showNotification('Scene setup received, starting story...', 'info');
-                                            }
-                                            break;
-                                            
-                                        case 'chunk':
-                                            fullMessage = parsed.message;
-                                            // Update the script area with latest content
-                                            this.updateScriptArea(fullMessage);
-                                            break;
-                                            
-                                        case 'done':
-                                            fullMessage = parsed.message;
-                                            this.finalizeStory(fullMessage);
-                                            this.showNotification('AI story completed!', 'success');
-                                            return;
-                                            
-                                        case 'error':
-                                            throw new Error(parsed.error);
-                                    }
-                                } catch (parseError) {
-                                    console.warn('Failed to parse streaming data:', data);
+                                switch (parsed.type) {
+                                    case 'setup_ready':
+                                        // We have LOC/CHA/STP - start displaying immediately
+                                        if (!hasStartedDisplay) {
+                                            hasStartedDisplay = true;
+                                            button.textContent = 'Loading Scene...';
+                                            fullAccumulated = parsed.message;
+                                            console.log('🎬 Starting story with setup:', parsed.message.substring(0, 100) + '...');
+                                            this.parseAndLoadStoryPartial(parsed.message);
+                                            this.showNotification('Scene setup received, starting story...', 'info');
+                                        }
+                                        break;
+                                        
+                                    case 'chunk':
+                                        fullAccumulated += parsed.message;
+                                        // Update the script area with latest content
+                                        this.updateScriptArea(fullAccumulated);
+                                        console.log('📝 Added chunk, total length:', fullAccumulated.length);
+                                        break;
+                                        
+                                    case 'done':
+                                        fullAccumulated = parsed.message;
+                                        console.log('✅ Story complete, final length:', fullAccumulated.length);
+                                        this.finalizeStory(fullAccumulated);
+                                        this.showNotification('AI story completed!', 'success');
+                                        return;
+                                        
+                                    case 'error':
+                                        throw new Error(parsed.error);
                                 }
+                            } catch (parseError) {
+                                console.warn('Failed to parse streaming data:', data, parseError);
                             }
                         }
                     }

@@ -14,5 +14,12 @@
     "mood": "flustered",
     "filename": "ava_flustered.png",
     "path": "resources/characters/ava_flustered.png"
+  },
+  {
+    "timestamp": "2025-06-06T13:18:07.112Z",
+    "type": "background",
+    "name": "secluded cove",
+    "filename": "secluded cove.png",
+    "path": "resources/backgrounds/secluded cove.png"
   }
 ]
