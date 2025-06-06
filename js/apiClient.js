@@ -1,7 +1,6 @@
 class APIClient {
-    constructor(baseURL = 'http://localhost:3000') {
+    constructor(baseURL = 'http://localhost:3500') {
         this.baseURL = baseURL;
-        this.socket = null;
     }
 
     async request(endpoint, options = {}) {
@@ -57,25 +56,6 @@ class APIClient {
         return this.request(endpoint, { method: 'DELETE' });
     }
 
-    initSocket() {
-        if (this.socket) return this.socket;
-
-        this.socket = io(this.baseURL);
-        
-        this.socket.on('connect', () => {
-            console.log('Connected to server via WebSocket');
-        });
-
-        this.socket.on('disconnect', () => {
-            console.log('Disconnected from server');
-        });
-
-        this.socket.on('connect_error', (error) => {
-            console.error('Socket connection error:', error);
-        });
-
-        return this.socket;
-    }
 
     async generateStory(prompt, genre = 'fantasy', length = 5, characters = []) {
         return this.post('/ai/generate-story', {
@@ -157,50 +137,6 @@ class APIClient {
         });
     }
 
-    chatWithAI(message, character, context = '') {
-        if (!this.socket) {
-            this.initSocket();
-        }
-
-        return new Promise((resolve, reject) => {
-            this.socket.emit('ai-chat', {
-                message,
-                character,
-                context
-            });
-
-            this.socket.once('ai-response', resolve);
-            this.socket.once('ai-error', reject);
-
-            setTimeout(() => {
-                reject(new Error('AI chat timeout'));
-            }, 30000);
-        });
-    }
-
-    joinStorySession(storyId) {
-        if (!this.socket) {
-            this.initSocket();
-        }
-        
-        this.socket.emit('join-story', storyId);
-    }
-
-    onStoryUpdate(callback) {
-        if (!this.socket) {
-            this.initSocket();
-        }
-        
-        this.socket.on('story-changed', callback);
-    }
-
-    sendStoryUpdate(storyId, data) {
-        if (!this.socket) {
-            this.initSocket();
-        }
-        
-        this.socket.emit('story-update', { storyId, ...data });
-    }
 
     async checkHealth() {
         try {
