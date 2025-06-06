@@ -34,15 +34,7 @@ class VisualNovelEngine {
         document.addEventListener('keydown', (e) => this.handleKeyPress(e));
         document.addEventListener('touchend', (e) => this.handleTouch(e));
         
-        const executeButton = document.getElementById('execute-script');
-        executeButton.addEventListener('click', () => this.executeScript());
-        
-        const scriptArea = document.getElementById('script-area');
-        scriptArea.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key === 'Enter') {
-                this.executeScript();
-            }
-        });
+        // Execute script functionality removed - only Kindroid integration
     }
     
     bindMobileControls() {
@@ -74,20 +66,6 @@ class VisualNovelEngine {
         this.handleSwipe = handleSwipe;
     }
     
-    executeScript() {
-        const scriptArea = document.getElementById('script-area');
-        const script = scriptArea.value.trim();
-        
-        if (!script) return;
-        
-        try {
-            this.loadScript(script);
-            this.startPlayback();
-        } catch (error) {
-            console.error('Script parsing error:', error);
-            alert('Error parsing script: ' + error.message);
-        }
-    }
     
     loadScript(scriptText) {
         this.parser.parseScript(scriptText);
@@ -245,7 +223,8 @@ class VisualNovelEngine {
     }
     
     handleClick(e) {
-        if (e.target.closest('#script-input')) {
+        // Skip clicks on Kindroid button
+        if (e.target.closest('#kindroid-btn')) {
             return;
         }
         
@@ -280,7 +259,8 @@ class VisualNovelEngine {
     }
     
     handleTouch(e) {
-        if (e.target.closest('#script-input')) {
+        // Skip touches on Kindroid button
+        if (e.target.closest('#kindroid-btn')) {
             return;
         }
         

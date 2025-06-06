@@ -2,11 +2,13 @@ class ScriptParser {
     constructor() {
         this.commands = [];
         this.currentIndex = 0;
+        this.storyTransitionPoints = []; // Store STP actions
     }
     
     parseScript(scriptText) {
         const lines = scriptText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
         this.commands = [];
+        this.storyTransitionPoints = []; // Reset STP for new script
         
         let currentLocation = null;
         let currentCharacters = [];
@@ -22,6 +24,10 @@ class ScriptParser {
                 } else if (command.type === 'dialogue' || command.type === 'action') {
                     command.location = currentLocation;
                     command.characters = [...currentCharacters];
+                } else if (command.type === 'stp') {
+                    // Store STP actions but don't add to commands (so they don't display)
+                    this.storyTransitionPoints = command.actions;
+                    continue; // Skip adding to commands
                 }
                 
                 this.commands.push(command);
@@ -39,7 +45,9 @@ class ScriptParser {
             return this.parseLocation(line);
         } else if (line.startsWith('CHA:')) {
             return this.parseCharacters(line);
-        } else if (line.includes(':') && !line.startsWith('LOC:') && !line.startsWith('CHA:')) {
+        } else if (line.startsWith('STP:')) {
+            return this.parseStoryTransitionPoints(line);
+        } else if (line.includes(':') && !line.startsWith('LOC:') && !line.startsWith('CHA:') && !line.startsWith('STP:')) {
             return this.parseDialogue(line, currentLocation, currentCharacters);
         } else if (line.length > 0) {
             return this.parseAction(line, currentLocation, currentCharacters);
@@ -75,6 +83,18 @@ class ScriptParser {
         return {
             type: 'characters',
             characters: characters
+        };
+    }
+
+    parseStoryTransitionPoints(line) {
+        const stpText = line.substring(4).trim();
+        const actions = stpText.split('/').map(action => action.trim()).filter(action => action.length > 0);
+        
+        console.log('📋 Story Transition Points found:', actions);
+        
+        return {
+            type: 'stp',
+            actions: actions
         };
     }
     
@@ -170,5 +190,13 @@ class ScriptParser {
             return true;
         }
         return false;
+    }
+
+    getStoryTransitionPoints() {
+        return this.storyTransitionPoints;
+    }
+
+    hasStoryTransitionPoints() {
+        return this.storyTransitionPoints.length > 0;
     }
 }

@@ -51,15 +51,16 @@ class KindroidClient {
         
         try {
             // Update button state
-            button.textContent = 'Getting AI Story...';
+            button.textContent = 'Streaming Story...';
             button.disabled = true;
             button.style.background = '#9ca3af';
 
-            // Send request to Kindroid AI
+            // Set up fetch with streaming
             const response = await fetch(`${this.baseURL}/api/kindroid/repeat-previous`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Accept': 'text/event-stream'
                 }
             });
 
@@ -67,24 +68,80 @@ class KindroidClient {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
-            const data = await response.json();
-            
-            if (data.success && data.message) {
-                // Parse the AI response as a story script
-                this.parseAndLoadStory(data.message);
-                this.showNotification('AI story loaded successfully!', 'success');
-            } else {
-                throw new Error('Invalid response from Kindroid AI');
-            }
+            const reader = response.body.getReader();
+            let fullMessage = '';
+            let hasStartedDisplay = false;
+
+            const processStream = async () => {
+                try {
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        
+                        if (done) break;
+                        
+                        const chunk = new TextDecoder().decode(value);
+                        const lines = chunk.split('\n');
+                        
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                const data = line.substring(6);
+                                if (data === '[DONE]') {
+                                    return;
+                                }
+                                
+                                try {
+                                    const parsed = JSON.parse(data);
+                                    
+                                    switch (parsed.type) {
+                                        case 'setup_ready':
+                                            // We have LOC/CHA/STP - start displaying immediately
+                                            if (!hasStartedDisplay) {
+                                                hasStartedDisplay = true;
+                                                button.textContent = 'Loading Scene...';
+                                                this.parseAndLoadStoryPartial(parsed.message);
+                                                this.showNotification('Scene setup received, starting story...', 'info');
+                                            }
+                                            break;
+                                            
+                                        case 'chunk':
+                                            fullMessage = parsed.message;
+                                            // Update the script area with latest content
+                                            this.updateScriptArea(fullMessage);
+                                            break;
+                                            
+                                        case 'done':
+                                            fullMessage = parsed.message;
+                                            this.finalizeStory(fullMessage);
+                                            this.showNotification('AI story completed!', 'success');
+                                            return;
+                                            
+                                        case 'error':
+                                            throw new Error(parsed.error);
+                                    }
+                                } catch (parseError) {
+                                    console.warn('Failed to parse streaming data:', data);
+                                }
+                            }
+                        }
+                    }
+                } catch (streamError) {
+                    console.error('Stream processing error:', streamError);
+                    this.showNotification('Streaming error occurred', 'error');
+                }
+            };
+
+            await processStream();
 
         } catch (error) {
             console.error('Kindroid request failed:', error);
             this.showNotification(`Failed to get AI story: ${error.message}`, 'error');
         } finally {
-            // Reset button state
-            button.textContent = originalText;
-            button.disabled = false;
-            button.style.background = '#6366f1';
+            // Reset button state after a delay
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.disabled = false;
+                button.style.background = '#6366f1';
+            }, 1000);
         }
     }
 
@@ -107,6 +164,61 @@ class KindroidClient {
                 } catch (error) {
                     console.error('Failed to load AI story:', error);
                     this.showNotification('AI story loaded but failed to parse. Check script format.', 'warning');
+                }
+            }
+        }
+    }
+
+    parseAndLoadStoryPartial(partialResponse) {
+        // Load partial response and start scene setup
+        const scriptArea = document.getElementById('script-area');
+        if (scriptArea) {
+            scriptArea.value = partialResponse;
+            
+            // Start loading the scene with whatever we have
+            if (window.game) {
+                try {
+                    window.game.loadScript(partialResponse);
+                    window.game.startPlayback();
+                    
+                    // Auto-advance to show the scene setup
+                    setTimeout(() => {
+                        this.autoAdvanceToFirstContent();
+                    }, 100);
+                } catch (error) {
+                    console.error('Failed to load partial story:', error);
+                }
+            }
+        }
+    }
+
+    updateScriptArea(fullMessage) {
+        // Update the script area with the latest content
+        const scriptArea = document.getElementById('script-area');
+        if (scriptArea) {
+            scriptArea.value = fullMessage;
+        }
+    }
+
+    finalizeStory(fullMessage) {
+        // Final load with complete story
+        const scriptArea = document.getElementById('script-area');
+        if (scriptArea) {
+            scriptArea.value = fullMessage;
+            
+            // Reload the complete script
+            if (window.game) {
+                try {
+                    window.game.loadScript(fullMessage);
+                    window.game.startPlayback();
+                    
+                    // Auto-advance to first dialogue/action
+                    setTimeout(() => {
+                        this.autoAdvanceToFirstContent();
+                    }, 100);
+                } catch (error) {
+                    console.error('Failed to finalize story:', error);
+                    this.showNotification('Story completed but failed to reload. Check script format.', 'warning');
                 }
             }
         }
