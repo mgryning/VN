@@ -8,6 +8,14 @@ class KindroidClient {
         
         if (!this.isTestMode && typeof window !== 'undefined') {
             this.setupUI();
+            // Create persistent input panel
+            setTimeout(() => {
+                this.createPersistentInputPanel();
+            }, 1000);
+            // Add temporary test buttons after a short delay  
+            setTimeout(() => {
+                this.createTestStpOptions();
+            }, 2000);
         }
     }
 
@@ -271,6 +279,9 @@ class KindroidClient {
                                             window.game.streaming = false;
                                             window.game.resumeFromWaiting();
                                         }
+                                        
+                                        // Display STP options after streaming is complete
+                                        this.displayStpOptions(fullAccumulated);
                                         return;
                                         
                                     case 'error':
@@ -363,6 +374,378 @@ class KindroidClient {
         }
     }
 
+
+    createPersistentInputPanel() {
+        console.log('🎮 Creating persistent input panel');
+        
+        // Create the persistent panel with no options initially
+        this.createStpOptionButtons([]);
+        
+        // Mark it as persistent so it doesn't get removed
+        const container = document.getElementById('stp-options-container');
+        if (container) {
+            container.setAttribute('data-persistent', 'true');
+        }
+    }
+
+    createTestStpOptions() {
+        // Create test options to see positioning
+        console.log('🧪 Adding test STP options to existing panel');
+        const testOptions = ['Say hello', 'Walk away'];
+        
+        // Update the existing panel with test options
+        this.updateStpOptions(testOptions);
+        
+        // Remove test options after 10 seconds, but keep the input panel
+        setTimeout(() => {
+            this.updateStpOptions([]);
+        }, 10000);
+    }
+
+    displayStpOptions(fullAccumulated) {
+        if (this.isTestMode || typeof window === 'undefined') {
+            console.log('📋 STP options would be displayed in browser mode');
+            return;
+        }
+
+        // Extract STP content from the accumulated text
+        const stpMatch = fullAccumulated.match(/STP:\s*(.+)/);
+        if (!stpMatch) {
+            console.log('⚠️ No STP content found to create options');
+            return;
+        }
+
+        const stpContent = stpMatch[1].trim();
+        console.log('🎯 Creating STP options from:', stpContent);
+
+        // Parse options from STP content (split by '/' for multiple options)
+        const options = stpContent.split('/').map(option => option.trim()).filter(option => option.length > 0);
+        
+        if (options.length === 0) {
+            console.log('⚠️ No valid options found in STP content');
+            return;
+        }
+
+        this.updateStpOptions(options);
+    }
+
+    updateStpOptions(options) {
+        // Update existing panel or create new one
+        const existingContainer = document.getElementById('stp-options-container');
+        
+        if (existingContainer) {
+            // Update existing panel
+            console.log(`🔄 Updating existing panel with ${options.length} options`);
+            this.updateUnifiedPanel(existingContainer, options);
+        } else {
+            // Create new panel
+            console.log(`🆕 Creating new panel with ${options.length} options`);
+            this.createStpOptionButtons(options);
+        }
+    }
+
+    createStpOptionButtons(options) {
+
+        // Find the story/dialogue box to position options relative to it
+        const dialogueBox = document.querySelector('.dialogue-box, #dialogue-box, .story-box, #story-box') || 
+                           document.querySelector('[class*="dialogue"], [class*="story"], [id*="dialogue"], [id*="story"]');
+        
+        // Create or update the options container
+        let optionsContainer = document.getElementById('stp-options-container');
+        if (!optionsContainer) {
+            optionsContainer = document.createElement('div');
+            optionsContainer.id = 'stp-options-container';
+            
+            if (dialogueBox) {
+                // Position relative to the dialogue box
+                const boxRect = dialogueBox.getBoundingClientRect();
+                console.log('📍 Dialogue box found:', {
+                    left: dialogueBox.offsetLeft,
+                    top: dialogueBox.offsetTop,
+                    width: dialogueBox.offsetWidth,
+                    height: dialogueBox.offsetHeight
+                });
+                
+                optionsContainer.style.cssText = `
+                    position: absolute;
+                    top: ${dialogueBox.offsetTop - 60}px;
+                    left: ${dialogueBox.offsetLeft}px;
+                    width: ${dialogueBox.offsetWidth}px;
+                    background: rgba(0, 0, 0, 0.8);
+                    border-radius: 12px 12px 0 0;
+                    padding: 0;
+                    display: flex;
+                    flex-direction: column;
+                    z-index: 1000;
+                    backdrop-filter: blur(5px);
+                    border: 2px solid white;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+                    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3);
+                    box-sizing: border-box;
+                `;
+            } else {
+                // Fallback positioning if dialogue box not found
+                console.log('⚠️ No dialogue box found, using fallback positioning');
+                optionsContainer.style.cssText = `
+                    position: fixed;
+                    top: 20%;
+                    right: 20px;
+                    background: rgba(0, 0, 0, 0.8);
+                    border-radius: 12px;
+                    padding: 15px 20px;
+                    display: flex;
+                    gap: 12px;
+                    flex-wrap: wrap;
+                    justify-content: flex-end;
+                    max-width: 400px;
+                    z-index: 1000;
+                    backdrop-filter: blur(5px);
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+                `;
+            }
+            
+            document.body.appendChild(optionsContainer);
+        } else {
+            // Clear existing options
+            optionsContainer.innerHTML = '';
+            
+            // Update positioning if dialogue box moved
+            if (dialogueBox) {
+                optionsContainer.style.top = `${dialogueBox.offsetTop - 60}px`;
+                optionsContainer.style.left = `${dialogueBox.offsetLeft}px`;
+                optionsContainer.style.width = `${dialogueBox.offsetWidth}px`;
+            }
+        }
+
+        // Create the unified panel content
+        this.createUnifiedPanel(optionsContainer, options);
+    }
+
+    createUnifiedPanel(container, options) {
+        // Create text input section (full width now)
+        const inputSection = document.createElement('div');
+        inputSection.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 15px 20px;
+            box-sizing: border-box;
+        `;
+
+        // Create text input
+        const textInput = document.createElement('input');
+        textInput.type = 'text';
+        textInput.id = 'stp-text-input';
+        textInput.placeholder = 'Type your response...';
+        textInput.style.cssText = `
+            flex: 1;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            padding: 10px 14px;
+            color: white;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s ease;
+        `;
+
+        // Add input focus effects
+        textInput.addEventListener('focus', () => {
+            textInput.style.background = 'rgba(255, 255, 255, 0.15)';
+            textInput.style.borderColor = 'rgba(102, 126, 234, 0.6)';
+            textInput.style.boxShadow = '0 0 0 2px rgba(102, 126, 234, 0.2)';
+        });
+
+        textInput.addEventListener('blur', () => {
+            textInput.style.background = 'rgba(255, 255, 255, 0.1)';
+            textInput.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+            textInput.style.boxShadow = 'none';
+        });
+
+        // Add enter key handler
+        textInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && textInput.value.trim()) {
+                this.handleTextInput(textInput.value.trim());
+                textInput.value = '';
+            }
+        });
+
+        // Create send button
+        const sendButton = document.createElement('button');
+        sendButton.textContent = 'Send';
+        sendButton.style.cssText = `
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            min-width: 60px;
+        `;
+
+        sendButton.addEventListener('click', () => {
+            if (textInput.value.trim()) {
+                this.handleTextInput(textInput.value.trim());
+                textInput.value = '';
+            }
+        });
+
+        sendButton.addEventListener('mouseenter', () => {
+            sendButton.style.transform = 'scale(1.05)';
+            sendButton.style.background = 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)';
+        });
+
+        sendButton.addEventListener('mouseleave', () => {
+            sendButton.style.transform = 'scale(1)';
+            sendButton.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+        });
+
+        inputSection.appendChild(textInput);
+        inputSection.appendChild(sendButton);
+
+        container.appendChild(inputSection);
+
+        // Create separate options container for center-right positioning
+        this.createCenterRightOptions(options);
+        
+        console.log(`✅ Created input panel and ${options.length} center-right option buttons`);
+    }
+
+    createCenterRightOptions(options) {
+        // Remove existing center-right options container if it exists
+        const existingContainer = document.getElementById('center-right-options');
+        if (existingContainer) {
+            existingContainer.remove();
+        }
+
+        if (options.length === 0) {
+            return;
+        }
+
+        // Create center-right options container
+        const optionsContainer = document.createElement('div');
+        optionsContainer.id = 'center-right-options';
+        optionsContainer.style.cssText = `
+            position: fixed;
+            top: 50%;
+            right: 20px;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 1000;
+            pointer-events: auto;
+        `;
+
+        // Create option buttons
+        options.forEach((option, index) => {
+            const button = document.createElement('button');
+            button.textContent = option;
+            button.className = 'stp-option-button';
+            button.style.cssText = `
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: none;
+                padding: 12px 20px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 500;
+                font-size: 14px;
+                transition: all 0.3s ease;
+                white-space: nowrap;
+                text-align: center;
+                min-width: 120px;
+                box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+            `;
+
+            // Add hover effects
+            button.addEventListener('mouseenter', () => {
+                button.style.transform = 'translateY(-2px) scale(1.05)';
+                button.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.4)';
+                button.style.background = 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)';
+            });
+
+            button.addEventListener('mouseleave', () => {
+                button.style.transform = 'translateY(0) scale(1)';
+                button.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)';
+                button.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            });
+
+            // Add click handler
+            button.addEventListener('click', () => {
+                console.log(`🎯 STP option clicked: "${option}"`);
+                this.handleStpOptionClick(option, index);
+            });
+
+            optionsContainer.appendChild(button);
+        });
+
+        // Add animation CSS if not exists
+        if (!document.getElementById('stp-animations')) {
+            const style = document.createElement('style');
+            style.id = 'stp-animations';
+            style.textContent = `
+                @keyframes fadeInRight {
+                    from {
+                        opacity: 0;
+                        transform: translateY(-50%) translateX(20px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(-50%) translateX(0);
+                    }
+                }
+                @keyframes fadeOut {
+                    from {
+                        opacity: 1;
+                        transform: translateY(-50%) translateX(0);
+                    }
+                    to {
+                        opacity: 0;
+                        transform: translateY(-50%) translateX(20px);
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // Add fade-in animation
+        optionsContainer.style.opacity = '0';
+        optionsContainer.style.animation = 'fadeInRight 0.5s ease forwards';
+
+        document.body.appendChild(optionsContainer);
+        console.log(`✅ Created ${options.length} center-right option buttons`);
+    }
+
+    updateUnifiedPanel(container, options) {
+        // Update the center-right options instead of panel options
+        this.createCenterRightOptions(options);
+        console.log(`🔄 Updated center-right options with ${options.length} buttons`);
+    }
+
+    handleTextInput(text) {
+        console.log(`📝 User typed: "${text}"`);
+        
+        // Show notification for now
+        this.showNotification(`You said: ${text}`, 'info');
+        
+        // TODO: Implement actual text input handling logic here
+        // This is where you'd send the custom text to the game engine or AI
+    }
+
+    handleStpOptionClick(option, index) {
+        console.log(`🎯 User selected STP option ${index + 1}: "${option}"`);
+        
+        // Show notification for now
+        this.showNotification(`Selected: ${option}`, 'info');
+        
+        // TODO: Implement actual option handling logic here
+        // This is where you'd send the choice back to the game engine or AI
+    }
 
     showNotification(message, type = 'info') {
         if (this.isTestMode || typeof window === 'undefined') {
