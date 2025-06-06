@@ -12,7 +12,8 @@
       "Bash(grep:*)",
       "Bash(rg:*)",
       "WebFetch(domain:docs.kindroid.ai)",
-      "mcp__o3__AskO3"
+      "mcp__o3__AskO3",
+      "Bash(npm test)"
     ],
     "deny": []
   }

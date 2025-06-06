@@ -182,6 +182,7 @@ router.post('/repeat-previous', async (req, res) => {
     }
 });
 
+
 // Helper function to check if we have basic setup information
 function hasBasicSetup(text) {
     // Check for complete lines with content, not just headers

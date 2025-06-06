@@ -1,9 +1,14 @@
 class KindroidClient {
-    constructor() {
-        this.baseURL = window.location.origin;
+    constructor(options = {}) {
+        this.baseURL = options.baseURL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
         this.streamAccumulator = '';
         this.sceneSetupComplete = false;
-        this.setupUI();
+        this.isTestMode = options.testMode || false;
+        this.testResults = {};
+        
+        if (!this.isTestMode && typeof window !== 'undefined') {
+            this.setupUI();
+        }
     }
 
     setupUI() {
@@ -48,19 +53,34 @@ class KindroidClient {
     }
 
     async requestStoryFromAI() {
-        const button = document.getElementById('kindroid-btn');
-        const originalText = button.textContent;
-        
-        try {
-            // Update button state and reset state
+        // Browser-specific UI updates
+        let button, originalText;
+        if (!this.isTestMode && typeof window !== 'undefined') {
+            button = document.getElementById('kindroid-btn');
+            originalText = button.textContent;
             button.textContent = 'Streaming Story...';
             button.disabled = true;
             button.style.background = '#9ca3af';
+        }
+        
+        try {
+            // Reset state
             this.streamAccumulator = '';
             this.sceneSetupComplete = false;
+            if (this.isTestMode) {
+                this.testResults = {
+                    streamingStarted: true,
+                    sceneSetupCompleted: false,
+                    directStreamingActivated: false,
+                    storyContentReceived: false,
+                    finalStoryLength: 0,
+                    error: null
+                };
+            }
 
             // Set up fetch with streaming
-            const response = await fetch(`${this.baseURL}/api/kindroid/repeat-previous`, {
+            const fetchFn = typeof fetch !== 'undefined' ? fetch : require('node-fetch');
+            const response = await fetchFn(`${this.baseURL}/api/kindroid/repeat-previous`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -109,11 +129,13 @@ class KindroidClient {
                                         // We have LOC/CHA/STP - start displaying immediately
                                         if (!hasStartedDisplay) {
                                             hasStartedDisplay = true;
-                                            button.textContent = 'Loading Scene...';
+                                            if (!this.isTestMode && button) {
+                                                button.textContent = 'Loading Scene...';
+                                            }
                                             fullAccumulated = parsed.message;
                                             console.log('🎬 Starting story with setup:', parsed.message);
                                             // Set streaming mode and load initial setup
-                                            if (window.game) {
+                                            if (!this.isTestMode && typeof window !== 'undefined' && window.game) {
                                                 window.game.streaming = true;
                                                 window.game.loadScript(parsed.message);
                                                 window.game.startPlayback();
@@ -134,16 +156,34 @@ class KindroidClient {
                                         // Update the script area with latest content
                                         this.updateScriptArea(fullAccumulated);
                                         
-                                        // Check if we've completed scene setup (past LOC, CHA, STP)
+                                        // Check if we've completed scene setup (past LOC, CHA, STP) or if this is just regular text
                                         if (!this.sceneSetupComplete && hasStartedDisplay) {
                                             // Look for text that comes after STP line - need meaningful content
                                             const stpMatch = fullAccumulated.match(/STP:.*?\n(.*)$/s);
-                                            if (stpMatch && stpMatch[1].trim().length > 10) { // Need more than just a few characters
+                                            console.log('🔍 STP detection:', { 
+                                                hasMatch: !!stpMatch, 
+                                                textAfterLength: stpMatch ? stpMatch[1].trim().length : 0,
+                                                fullLength: fullAccumulated.length,
+                                                sample: fullAccumulated.substring(0, 200) + '...'
+                                            });
+                                            
+                                            // Check if this is a VN script format or just regular text
+                                            const hasVNFormat = fullAccumulated.match(/LOC:|CHA:|STP:/);
+                                            
+                                            if (stpMatch && stpMatch[1].trim().length > 10) { 
+                                                // VN format with complete STP
                                                 this.sceneSetupComplete = true;
                                                 console.log('🎭 Scene setup complete, switching to direct text streaming');
                                                 console.log('📄 Text after STP:', JSON.stringify(stpMatch[1]));
+                                                
+                                                if (this.isTestMode) {
+                                                    this.testResults.sceneSetupCompleted = true;
+                                                    this.testResults.directStreamingActivated = true;
+                                                    this.testResults.storyContentReceived = true;
+                                                }
+                                                
                                                 // Clear any setup parsing and prepare for direct streaming
-                                                if (window.game) {
+                                                if (!this.isTestMode && typeof window !== 'undefined' && window.game) {
                                                     window.game.characterName.textContent = 'Story';
                                                     window.game.dialogueText.textContent = '';
                                                     window.game.hideContinueIndicator();
@@ -153,6 +193,20 @@ class KindroidClient {
                                                 this.streamAccumulator = postStpText;
                                                 this.updateStreamedText();
                                                 return; // Skip processing this chunk as script
+                                            } else if (!hasVNFormat && fullAccumulated.trim().length > 50) {
+                                                // Regular text format - treat entire content as story
+                                                this.sceneSetupComplete = true;
+                                                console.log('🎭 Regular text detected, treating as story content');
+                                                
+                                                if (this.isTestMode) {
+                                                    this.testResults.sceneSetupCompleted = true;
+                                                    this.testResults.directStreamingActivated = true;
+                                                    this.testResults.storyContentReceived = true;
+                                                }
+                                                
+                                                this.streamAccumulator = fullAccumulated;
+                                                this.updateStreamedText();
+                                                return;
                                             }
                                         }
                                         
@@ -160,6 +214,12 @@ class KindroidClient {
                                             // Accumulate streaming text and update display
                                             console.log('📺 Streaming mode - adding to accumulator:', JSON.stringify(parsed.message));
                                             this.streamAccumulator = (this.streamAccumulator || '') + parsed.message;
+                                            
+                                            if (this.isTestMode) {
+                                                this.testResults.directStreamingActivated = true;
+                                                this.testResults.storyContentReceived = true;
+                                            }
+                                            
                                             this.updateStreamedText();
                                         } else {
                                             // Still in setup phase - process as script commands
@@ -173,7 +233,7 @@ class KindroidClient {
                                             lineBuffer = parts[parts.length - 1];
                                             
                                             // Only send complete lines to the game engine
-                                            if (completeLines.length > 0 && window.game) {
+                                            if (completeLines.length > 0 && !this.isTestMode && typeof window !== 'undefined' && window.game) {
                                                 console.log('📝 Adding complete lines:', completeLines);
                                                 window.game.loadScript(completeLines + '\n', { append: true });
                                                 window.game.resumeFromWaiting();
@@ -212,7 +272,11 @@ class KindroidClient {
                     }
                 } catch (streamError) {
                     console.error('Stream processing error:', streamError);
-                    this.showNotification('Streaming error occurred', 'error');
+                    if (this.isTestMode) {
+                        this.testResults.error = streamError.message;
+                    } else {
+                        this.showNotification('Streaming error occurred', 'error');
+                    }
                 }
             };
 
@@ -220,28 +284,40 @@ class KindroidClient {
 
         } catch (error) {
             console.error('Kindroid request failed:', error);
-            this.showNotification(`Failed to get AI story: ${error.message}`, 'error');
+            if (this.isTestMode) {
+                this.testResults.error = error.message;
+            } else {
+                this.showNotification(`Failed to get AI story: ${error.message}`, 'error');
+            }
         } finally {
-            // Reset button state after a delay
-            setTimeout(() => {
-                button.textContent = originalText;
-                button.disabled = false;
-                button.style.background = '#6366f1';
-            }, 1000);
+            if (this.isTestMode) {
+                this.testResults.finalStoryLength = this.streamAccumulator?.length || 0;
+            }
+            
+            // Reset button state after a delay (browser only)
+            if (!this.isTestMode && button) {
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.disabled = false;
+                    button.style.background = '#6366f1';
+                }, 1000);
+            }
         }
     }
 
     updateScriptArea(fullMessage) {
-        // Update the script area with the latest content
-        const scriptArea = document.getElementById('script-area');
-        if (scriptArea) {
-            scriptArea.value = fullMessage;
+        // Update the script area with the latest content (browser only)
+        if (!this.isTestMode && typeof window !== 'undefined') {
+            const scriptArea = document.getElementById('script-area');
+            if (scriptArea) {
+                scriptArea.value = fullMessage;
+            }
         }
     }
 
     updateStreamedText() {
         // Update the dialogue box with accumulated streaming text
-        if (window.game && window.game.dialogueText && this.streamAccumulator) {
+        if (!this.isTestMode && typeof window !== 'undefined' && window.game && window.game.dialogueText && this.streamAccumulator) {
             // Cancel any existing typewriter effects
             if (window.game.typewriterInterval) {
                 clearInterval(window.game.typewriterInterval);
@@ -255,6 +331,8 @@ class KindroidClient {
             // Set text directly without typewriter effect for smoother streaming
             window.game.dialogueText.textContent = this.streamAccumulator;
             console.log('📺 Updated streaming text, length:', this.streamAccumulator.length);
+        } else if (this.isTestMode) {
+            console.log('📺 Test mode - streaming text length:', this.streamAccumulator?.length || 0);
         }
     }
 
@@ -276,6 +354,11 @@ class KindroidClient {
 
 
     showNotification(message, type = 'info') {
+        if (this.isTestMode || typeof window === 'undefined') {
+            console.log(`[${type.toUpperCase()}] ${message}`);
+            return;
+        }
+        
         const notification = document.createElement('div');
         notification.className = `kindroid-notification ${type}`;
         notification.textContent = message;
@@ -315,9 +398,15 @@ class KindroidClient {
     }
 }
 
-// Initialize Kindroid client when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    window.kindroidClient = new KindroidClient();
-});
+// Initialize Kindroid client when DOM is loaded (browser only)
+if (typeof window !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        window.kindroidClient = new KindroidClient();
+    });
+    window.KindroidClient = KindroidClient;
+}
 
-window.KindroidClient = KindroidClient;
+// Node.js module export
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = KindroidClient;
+}
