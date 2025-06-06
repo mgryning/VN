@@ -74,6 +74,9 @@ class KindroidClient {
                     directStreamingActivated: false,
                     storyContentReceived: false,
                     finalStoryLength: 0,
+                    locationLength: 0,
+                    charactersLength: 0,
+                    setupLength: 0,
                     error: null
                 };
             }
@@ -180,6 +183,15 @@ class KindroidClient {
                                                     this.testResults.sceneSetupCompleted = true;
                                                     this.testResults.directStreamingActivated = true;
                                                     this.testResults.storyContentReceived = true;
+                                                    
+                                                    // Extract and measure setup components
+                                                    const locMatch = fullAccumulated.match(/LOC:\s*(.+)/);
+                                                    const chaMatch = fullAccumulated.match(/CHA:\s*(.+)/);
+                                                    const stpMatchForMeasure = fullAccumulated.match(/STP:\s*(.+)/);
+                                                    
+                                                    this.testResults.locationLength = locMatch ? locMatch[1].trim().length : 0;
+                                                    this.testResults.charactersLength = chaMatch ? chaMatch[1].trim().length : 0;
+                                                    this.testResults.setupLength = stpMatchForMeasure ? stpMatchForMeasure[1].trim().length : 0;
                                                 }
                                                 
                                                 // Clear any setup parsing and prepare for direct streaming
@@ -202,6 +214,11 @@ class KindroidClient {
                                                     this.testResults.sceneSetupCompleted = true;
                                                     this.testResults.directStreamingActivated = true;
                                                     this.testResults.storyContentReceived = true;
+                                                    
+                                                    // For regular text, set minimal values since no VN format detected
+                                                    this.testResults.locationLength = 0;
+                                                    this.testResults.charactersLength = 0;
+                                                    this.testResults.setupLength = 0;
                                                 }
                                                 
                                                 this.streamAccumulator = fullAccumulated;

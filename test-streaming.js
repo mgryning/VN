@@ -46,10 +46,11 @@ class StreamingTest {
         return new Promise((resolve, reject) => {
             this.log('🚀 Starting development server...');
             
-            // Start the server using npm run dev
+            // Start the server using npm run dev with process group
             this.serverProcess = spawn('npm', ['run', 'dev'], {
                 stdio: ['ignore', 'pipe', 'pipe'],
-                shell: true
+                shell: true,
+                detached: true // Create new process group for proper cleanup
             });
 
             this.serverProcess.stdout.on('data', (data) => {
@@ -92,21 +93,55 @@ class StreamingTest {
             this.log('🛑 Stopping development server...');
             
             return new Promise((resolve) => {
-                this.serverProcess.on('exit', () => {
-                    this.log('✅ Server stopped');
+                // Kill the entire process group to ensure all child processes are terminated
+                try {
+                    process.kill(-this.serverProcess.pid, 'SIGTERM');
+                } catch (error) {
+                    this.log(`⚠️ Error sending SIGTERM: ${error.message}`);
+                }
+                
+                setTimeout(() => {
+                    try {
+                        // Force kill the process group if still running
+                        process.kill(-this.serverProcess.pid, 'SIGKILL');
+                    } catch (error) {
+                        // Process already dead, that's fine
+                    }
+                    
+                    // Also kill any processes using port 3500
+                    const { spawn } = require('child_process');
+                    const killPort = spawn('bash', ['-c', 'lsof -ti:3500 | xargs kill -9 2>/dev/null || true'], {
+                        stdio: 'ignore'
+                    });
+                    
+                    killPort.on('close', () => {
+                        this.log('✅ Server and port cleanup completed');
+                        resolve();
+                    });
+                    
+                    // Fallback timeout
+                    setTimeout(() => {
+                        this.log('✅ Server cleanup timeout reached');
+                        resolve();
+                    }, 2000);
+                }, 1000);
+            });
+        } else {
+            // Still try to clean up port 3500 even if no server process
+            const { spawn } = require('child_process');
+            const killPort = spawn('bash', ['-c', 'lsof -ti:3500 | xargs kill -9 2>/dev/null || true'], {
+                stdio: 'ignore'
+            });
+            
+            return new Promise((resolve) => {
+                killPort.on('close', () => {
+                    this.log('✅ Port cleanup completed');
                     resolve();
                 });
                 
-                // Try graceful shutdown first
-                this.serverProcess.kill('SIGTERM');
-                
-                // Force kill after 3 seconds if needed
                 setTimeout(() => {
-                    if (!this.serverProcess.killed) {
-                        this.serverProcess.kill('SIGKILL');
-                    }
                     resolve();
-                }, 3000);
+                }, 1000);
             });
         }
     }
@@ -186,6 +221,11 @@ class StreamingTest {
 
             // Check scene setup completion
             this.assert(results.sceneSetupCompleted === true, 'Scene setup (LOC/CHA/STP) completed successfully');
+            
+            // Check scene setup content quality
+            this.assert(results.locationLength > 2, `Location has sufficient content (${results.locationLength} characters, minimum 3)`);
+            this.assert(results.charactersLength > 2, `Characters have sufficient content (${results.charactersLength} characters, minimum 3)`);
+            this.assert(results.setupLength > 3, `Setup description has sufficient content (${results.setupLength} characters, minimum 4)`);
 
             // Check direct streaming activation
             this.assert(results.directStreamingActivated === true, 'Direct streaming mode was activated');
@@ -217,6 +257,16 @@ class StreamingTest {
         } finally {
             // Always stop the server
             await this.stopServer();
+            
+            // Additional cleanup - ensure no processes remain on port 3500
+            const { spawn } = require('child_process');
+            const finalCleanup = spawn('bash', ['-c', 'lsof -ti:3500 | xargs kill -9 2>/dev/null || true'], {
+                stdio: 'ignore'
+            });
+            await new Promise((resolve) => {
+                finalCleanup.on('close', resolve);
+                setTimeout(resolve, 1000);
+            });
         }
 
         // Print summary
@@ -290,6 +340,17 @@ async function main() {
     const cleanup = async () => {
         console.log('\n🧹 Cleaning up...');
         await test.stopServer();
+        
+        // Final port cleanup
+        const { spawn } = require('child_process');
+        const killPort = spawn('bash', ['-c', 'lsof -ti:3500 | xargs kill -9 2>/dev/null || true'], {
+            stdio: 'ignore'
+        });
+        await new Promise((resolve) => {
+            killPort.on('close', resolve);
+            setTimeout(resolve, 1000);
+        });
+        
         process.exit(0);
     };
     
@@ -297,7 +358,7 @@ async function main() {
     process.on('SIGTERM', cleanup);
     process.on('uncaughtException', async (error) => {
         console.error('💥 Uncaught exception:', error);
-        await test.stopServer();
+        await cleanup();
         process.exit(1);
     });
     
