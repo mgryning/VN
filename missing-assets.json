@@ -45,5 +45,13 @@
     "mood": "eager",
     "filename": "ava_eager.png",
     "path": "resources/characters/ava_eager.png"
+  },
+  {
+    "timestamp": "2025-06-06T20:22:53.713Z",
+    "type": "character",
+    "name": "ava",
+    "mood": "reluctant",
+    "filename": "ava_reluctant.png",
+    "path": "resources/characters/ava_reluctant.png"
   }
 ]

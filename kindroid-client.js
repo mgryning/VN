@@ -795,14 +795,322 @@ class KindroidClient {
         console.log(`🔄 Updated center-right options with ${options.length} buttons`);
     }
 
-    handleTextInput(text) {
+    async handleTextInput(text) {
         console.log(`📝 User typed: "${text}"`);
         
-        // Show notification for now
-        this.showNotification(`You said: ${text}`, 'info');
+        // Show notification that we're processing
+        this.showNotification(`Sending: ${text}`, 'info');
         
-        // TODO: Implement actual text input handling logic here
-        // This is where you'd send the custom text to the game engine or AI
+        // Send the user's message to Kindroid AI like the "Get AI Story" button
+        await this.sendCustomMessageToAI(text);
+    }
+
+    async sendCustomMessageToAI(userMessage) {
+        // Browser-specific UI updates
+        let button, originalText;
+        if (!this.isTestMode && typeof window !== 'undefined') {
+            button = document.getElementById('kindroid-btn');
+            if (button) {
+                originalText = button.textContent;
+                button.textContent = 'Processing Message...';
+                button.disabled = true;
+                button.style.background = '#9ca3af';
+            }
+        }
+        
+        try {
+            // Reset state
+            this.streamAccumulator = '';
+            this.sceneSetupComplete = false;
+            if (this.isTestMode) {
+                this.testResults = {
+                    streamingStarted: true,
+                    sceneSetupCompleted: false,
+                    directStreamingActivated: false,
+                    storyContentReceived: false,
+                    finalStoryLength: 0,
+                    locationLength: 0,
+                    charactersLength: 0,
+                    setupLength: 0,
+                    error: null
+                };
+            }
+
+            // Send custom message to Kindroid AI
+            const fetchFn = typeof fetch !== 'undefined' ? fetch : require('node-fetch');
+            const response = await fetchFn(`${this.baseURL}/api/kindroid/send-message`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'text/event-stream'
+                },
+                body: JSON.stringify({
+                    message: userMessage,
+                    stream: true
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            // Check if this is a streaming response or regular JSON
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('text/event-stream')) {
+                // Handle streaming response (same as requestStoryFromAI)
+                await this.handleStreamingResponse(response);
+            } else {
+                // Handle regular JSON response
+                const data = await response.json();
+                if (data.success && data.message) {
+                    // Process the message as if it came from streaming
+                    this.processAIMessage(data.message);
+                } else {
+                    throw new Error(data.error || 'Failed to get AI response');
+                }
+            }
+
+        } catch (error) {
+            console.error('Custom message failed:', error);
+            if (this.isTestMode) {
+                this.testResults.error = error.message;
+            } else {
+                this.showNotification(`Failed to send message: ${error.message}`, 'error');
+            }
+        } finally {
+            if (this.isTestMode) {
+                this.testResults.finalStoryLength = this.streamAccumulator?.length || 0;
+            }
+            
+            // Reset button state after a delay (browser only)
+            if (!this.isTestMode && button) {
+                setTimeout(() => {
+                    button.textContent = originalText || 'Get AI Story';
+                    button.disabled = false;
+                    button.style.background = '#6366f1';
+                }, 1000);
+            }
+        }
+    }
+
+    async handleStreamingResponse(response) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let pending = '';
+        let fullAccumulated = '';
+        let hasStartedDisplay = false;
+        let lineBuffer = '';
+
+        const processStream = async () => {
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    
+                    if (done) break;
+                    
+                    pending += decoder.decode(value, { stream: true });
+                    
+                    // Handle every complete \n\n block we have
+                    let idx;
+                    while ((idx = pending.indexOf('\n\n')) !== -1) {
+                        const raw = pending.slice(0, idx).trim();
+                        pending = pending.slice(idx + 2);
+                        
+                        // Optional "event: ..." line
+                        const payloadLine = raw.replace(/^event:.*\n?/, '');
+                        const data = payloadLine.replace(/^data:\s*/, '');
+                        
+                        if (!data) continue;
+                        
+                        try {
+                            const parsed = JSON.parse(data);
+                            console.log('📨 Received event:', parsed.type, 'Content length:', parsed.message?.length || 0);
+                            
+                            switch (parsed.type) {
+                                case 'setup_ready':
+                                    if (!hasStartedDisplay) {
+                                        hasStartedDisplay = true;
+                                        fullAccumulated = parsed.message;
+                                        console.log('🎬 Starting story with setup:', parsed.message);
+                                        this.initializeGameDisplay(parsed.message);
+                                    }
+                                    break;
+                                    
+                                case 'chunk':
+                                    console.log('🔄 Processing chunk:', JSON.stringify(parsed.message), 'Setup complete:', this.sceneSetupComplete);
+                                    fullAccumulated += parsed.message;
+                                    this.updateScriptArea(fullAccumulated);
+                                    this.processStreamingChunk(parsed.message, fullAccumulated, lineBuffer);
+                                    break;
+                                    
+                                case 'done':
+                                    fullAccumulated = parsed.message;
+                                    console.log('✅ Story complete, final length:', fullAccumulated.length);
+                                    this.updateScriptArea(fullAccumulated);
+                                    this.finalizeStory(fullAccumulated);
+                                    return;
+                                    
+                                case 'error':
+                                    throw new Error(parsed.error);
+                            }
+                        } catch (parseError) {
+                            console.warn('Failed to parse streaming data:', data, parseError);
+                        }
+                    }
+                }
+            } catch (streamError) {
+                console.error('Stream processing error:', streamError);
+                if (this.isTestMode) {
+                    this.testResults.error = streamError.message;
+                } else {
+                    this.showNotification('Streaming error occurred', 'error');
+                }
+            }
+        };
+
+        await processStream();
+    }
+
+    initializeGameDisplay(message) {
+        if (!this.isTestMode && typeof window !== 'undefined' && window.game) {
+            window.game.streaming = true;
+            window.game.loadScript(message);
+            window.game.startPlayback();
+            // Clear the "click to begin" message
+            setTimeout(() => {
+                if (window.game.dialogueText) {
+                    window.game.dialogueText.textContent = '';
+                    window.game.characterName.textContent = '';
+                }
+            }, 100);
+        }
+    }
+
+    processStreamingChunk(chunk, fullAccumulated, lineBuffer) {
+        // Check if we've completed scene setup (past LOC, CHA, STP) or if this is just regular text
+        if (!this.sceneSetupComplete) {
+            // Look for text that comes after STP line - need meaningful content
+            const stpMatch = fullAccumulated.match(/STP:.*?\n(.*)$/s);
+            console.log('🔍 STP detection:', { 
+                hasMatch: !!stpMatch, 
+                textAfterLength: stpMatch ? stpMatch[1].trim().length : 0,
+                fullLength: fullAccumulated.length,
+                sample: fullAccumulated.substring(0, 200) + '...'
+            });
+            
+            // Check if this is a VN script format or just regular text
+            const hasVNFormat = fullAccumulated.match(/LOC:|CHA:|STP:/);
+            
+            if (stpMatch && stpMatch[1].trim().length > 10) { 
+                // VN format with complete STP
+                this.sceneSetupComplete = true;
+                console.log('🎭 Scene setup complete, switching to direct text streaming');
+                this.handleSceneSetupComplete(stpMatch[1]);
+            } else if (!hasVNFormat && fullAccumulated.trim().length > 50) {
+                // Regular text format - treat entire content as story
+                this.sceneSetupComplete = true;
+                console.log('🎭 Regular text detected, treating as story content');
+                this.handleRegularTextContent(fullAccumulated);
+            }
+        }
+        
+        if (this.sceneSetupComplete) {
+            // Accumulate streaming text and update display
+            console.log('📺 Streaming mode - adding to accumulator:', JSON.stringify(chunk));
+            this.streamAccumulator = (this.streamAccumulator || '') + chunk;
+            this.updateStreamedText();
+        } else {
+            // Still in setup phase - process as script commands
+            this.handleSetupPhaseChunk(chunk, lineBuffer);
+        }
+    }
+
+    handleSceneSetupComplete(postStpText) {
+        if (this.isTestMode) {
+            this.testResults.sceneSetupCompleted = true;
+            this.testResults.directStreamingActivated = true;
+            this.testResults.storyContentReceived = true;
+        }
+        
+        // Clear any setup parsing and prepare for direct streaming
+        if (!this.isTestMode && typeof window !== 'undefined' && window.game) {
+            window.game.characterName.textContent = 'Story';
+            window.game.dialogueText.textContent = '';
+            window.game.hideContinueIndicator();
+        }
+        // Extract text after STP and set as initial content
+        this.streamAccumulator = postStpText;
+        this.updateStreamedText();
+    }
+
+    handleRegularTextContent(fullAccumulated) {
+        if (this.isTestMode) {
+            this.testResults.sceneSetupCompleted = true;
+            this.testResults.directStreamingActivated = true;
+            this.testResults.storyContentReceived = true;
+        }
+        
+        this.streamAccumulator = fullAccumulated;
+        this.updateStreamedText();
+    }
+
+    handleSetupPhaseChunk(chunk, lineBuffer) {
+        // Buffer chunks until we have complete lines
+        lineBuffer += chunk;
+        const parts = lineBuffer.split('\n');
+        
+        // Everything except the last element is a complete line
+        const completeLines = parts.slice(0, -1).join('\n');
+        // Keep the last part (might be incomplete) for next chunk
+        lineBuffer = parts[parts.length - 1];
+        
+        // Only send complete lines to the game engine
+        if (completeLines.length > 0 && !this.isTestMode && typeof window !== 'undefined' && window.game) {
+            console.log('📝 Adding complete lines:', completeLines);
+            window.game.loadScript(completeLines + '\n', { append: true });
+            window.game.resumeFromWaiting();
+        }
+    }
+
+    finalizeStory(fullAccumulated) {
+        // End streaming mode without flushing line buffer to preserve streamed content
+        if (window.game) {
+            window.game.streaming = false;
+            window.game.resumeFromWaiting();
+        }
+        
+        // Display STP options after streaming is complete
+        this.displayStpOptions(fullAccumulated);
+    }
+
+    processAIMessage(message) {
+        // Process non-streaming AI response
+        console.log('📄 Processing AI message:', message);
+        
+        // Update script area
+        this.updateScriptArea(message);
+        
+        // Check if it's VN format or regular text
+        const hasVNFormat = message.match(/LOC:|CHA:|STP:/);
+        
+        if (hasVNFormat) {
+            // Process as VN script
+            if (!this.isTestMode && typeof window !== 'undefined' && window.game) {
+                window.game.streaming = false;
+                window.game.loadScript(message);
+                window.game.startPlayback();
+            }
+            // Display STP options
+            this.displayStpOptions(message);
+        } else {
+            // Process as regular story text
+            this.streamAccumulator = message;
+            this.updateStreamedText();
+            if (!this.isTestMode && typeof window !== 'undefined' && window.game) {
+                window.game.characterName.textContent = 'Story';
+                window.game.streaming = false;
+            }
+        }
     }
 
     handleStpOptionClick(option, index) {
