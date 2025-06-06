@@ -51,6 +51,17 @@ class Scene {
                 char.name.toLowerCase() !== 'morten'
             );
         }
+        
+        // Update the speaking character's mood immediately
+        if (command.speaker && command.mood) {
+            const speakingChar = this.currentCharacters.find(char => 
+                char.name.toLowerCase() === command.speaker.toLowerCase()
+            );
+            if (speakingChar) {
+                speakingChar.mood = command.mood;
+            }
+        }
+        
         this.currentLocation = command.location || this.currentLocation;
         await this.renderScene();
     }

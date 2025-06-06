@@ -119,9 +119,12 @@ class VisualNovelEngine {
         
         if (this.currentCommand.type === 'dialogue') {
             this.showDialogue(this.currentCommand);
-            await this.scene.highlightCharacter(this.currentCommand.speaker);
         } else if (this.currentCommand.type === 'action') {
             this.showAction(this.currentCommand);
+        } else if (this.currentCommand.type === 'characters') {
+            // Character-only commands (mood changes) should auto-advance
+            // since they don't provide new story content
+            setTimeout(() => this.nextCommand(), 100);
         } else {
             if (this.autoMode) {
                 setTimeout(() => this.nextCommand(), 1000);

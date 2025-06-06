@@ -283,15 +283,11 @@ class Renderer {
         }
         
         // Position character bottom to align with dialogue box top
-        const dialogueBox = document.getElementById('dialogue-box');
-        let dialogueBoxTop = this.height - 160; // fallback
-        
-        if (dialogueBox) {
-            const rect = dialogueBox.getBoundingClientRect();
-            const canvasRect = this.canvas.getBoundingClientRect();
-            // Convert dialogue box position to canvas coordinates
-            dialogueBoxTop = (rect.top - canvasRect.top) * (this.height / canvasRect.height);
-        }
+        // Calculate based on CSS: bottom: 20px, padding: 20px, border: 2px
+        // Dialogue box top = canvas height - bottom margin - estimated height of text area
+        const dialogueBoxBottomMargin = 20;
+        const estimatedDialogueHeight = 120; // Approximate height including padding and text
+        const dialogueBoxTop = this.height - dialogueBoxBottomMargin - estimatedDialogueHeight;
         
         y = dialogueBoxTop - charHeight;
         
