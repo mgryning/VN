@@ -1,0 +1,198 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #000;
+    overflow: hidden;
+    touch-action: manipulation;
+}
+
+#game-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#game-canvas {
+    max-width: 100%;
+    max-height: 100%;
+    background: #222;
+    border-radius: 8px;
+}
+
+#ui-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+}
+
+#dialogue-box {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    border: 2px solid #fff;
+    border-radius: 12px;
+    padding: 20px;
+    pointer-events: auto;
+    backdrop-filter: blur(5px);
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+}
+
+#dialogue-box.visible {
+    transform: translateY(0);
+}
+
+#character-name {
+    color: #ffd700;
+    font-weight: bold;
+    font-size: 1.2em;
+    margin-bottom: 10px;
+}
+
+#dialogue-text {
+    color: #fff;
+    font-size: 1.1em;
+    line-height: 1.4;
+    min-height: 60px;
+}
+
+#continue-indicator {
+    position: absolute;
+    bottom: 10px;
+    right: 20px;
+    color: #ffd700;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+#controls {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    gap: 10px;
+    pointer-events: auto;
+}
+
+#controls button {
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    border: 1px solid #fff;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+#controls button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+#script-input {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    width: 300px;
+    background: rgba(0, 0, 0, 0.9);
+    border: 1px solid #555;
+    border-radius: 8px;
+    padding: 15px;
+    z-index: 20;
+}
+
+#script-area {
+    width: 100%;
+    height: 120px;
+    background: #333;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 10px;
+    font-family: monospace;
+    font-size: 12px;
+    resize: vertical;
+}
+
+#execute-script {
+    width: 100%;
+    margin-top: 10px;
+    background: #007acc;
+    color: #fff;
+    border: none;
+    padding: 10px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#execute-script:hover {
+    background: #005a9e;
+}
+
+@media (max-width: 768px) {
+    #script-input {
+        width: calc(100vw - 40px);
+        top: 10px;
+        left: 20px;
+        right: 20px;
+    }
+    
+    #dialogue-box {
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        padding: 15px;
+    }
+    
+    #controls {
+        top: 10px;
+        right: 10px;
+        flex-direction: column;
+    }
+    
+    #controls button {
+        padding: 12px 16px;
+        font-size: 14px;
+    }
+}
+
+@media (max-height: 600px) {
+    #script-input {
+        display: none;
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+.fade-out {
+    animation: fadeOut 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}

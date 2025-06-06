@@ -1,0 +1,24 @@
+{
+  "watch": [
+    "server/",
+    "engine/",
+    "js/",
+    ".env"
+  ],
+  "ext": "js,json,env",
+  "ignore": [
+    "node_modules/",
+    "*.log",
+    "*.md",
+    "public/",
+    "client/"
+  ],
+  "delay": 500,
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "events": {
+    "restart": "echo '🔄 Server restarted due to file changes'"
+  },
+  "verbose": true
+}
