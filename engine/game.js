@@ -250,7 +250,8 @@ class VisualNovelEngine {
             return;
         }
         
-        if (this.isPlaying) {
+        // Only allow manual advancement when not streaming
+        if (this.isPlaying && !this.streaming) {
             this.nextCommand();
         }
     }
@@ -258,25 +259,28 @@ class VisualNovelEngine {
     handleKeyPress(e) {
         if (e.target.tagName === 'TEXTAREA') return;
         
-        switch (e.key) {
-            case ' ':
-            case 'Enter':
-                e.preventDefault();
-                if (this.isPlaying) {
-                    this.nextCommand();
-                }
-                break;
-            case 'ArrowLeft':
-            case 'Backspace':
-                e.preventDefault();
-                if (this.isPlaying) {
-                    this.previousCommand();
-                }
-                break;
-            case 'a':
-            case 'A':
-                this.toggleAutoMode();
-                break;
+        // Only allow manual controls when not streaming
+        if (!this.streaming) {
+            switch (e.key) {
+                case ' ':
+                case 'Enter':
+                    e.preventDefault();
+                    if (this.isPlaying) {
+                        this.nextCommand();
+                    }
+                    break;
+                case 'ArrowLeft':
+                case 'Backspace':
+                    e.preventDefault();
+                    if (this.isPlaying) {
+                        this.previousCommand();
+                    }
+                    break;
+                case 'a':
+                case 'A':
+                    this.toggleAutoMode();
+                    break;
+            }
         }
     }
     
@@ -287,7 +291,8 @@ class VisualNovelEngine {
         }
         
         e.preventDefault();
-        if (this.isPlaying) {
+        // Only allow manual advancement when not streaming
+        if (this.isPlaying && !this.streaming) {
             this.nextCommand();
         }
     }

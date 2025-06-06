@@ -73,6 +73,7 @@ class KindroidClient {
             let pending = '';
             let fullAccumulated = '';
             let hasStartedDisplay = false;
+            let lineBuffer = ''; // Buffer for incomplete lines
 
             const processStream = async () => {
                 try {
@@ -127,11 +128,23 @@ class KindroidClient {
                                         fullAccumulated += parsed.message;
                                         // Update the script area with latest content
                                         this.updateScriptArea(fullAccumulated);
-                                        // Append new content to the game engine
-                                        if (window.game) {
-                                            window.game.loadScript(parsed.message, { append: true });
+                                        
+                                        // Buffer chunks until we have complete lines
+                                        lineBuffer += parsed.message;
+                                        const parts = lineBuffer.split('\n');
+                                        
+                                        // Everything except the last element is a complete line
+                                        const completeLines = parts.slice(0, -1).join('\n');
+                                        // Keep the last part (might be incomplete) for next chunk
+                                        lineBuffer = parts[parts.length - 1];
+                                        
+                                        // Only send complete lines to the game engine
+                                        if (completeLines.length > 0 && window.game) {
+                                            console.log('📝 Adding complete lines:', completeLines);
+                                            window.game.loadScript(completeLines + '\n', { append: true });
                                             window.game.resumeFromWaiting();
                                         }
+                                        
                                         console.log('📝 Added chunk, total length:', fullAccumulated.length);
                                         break;
                                         
@@ -140,6 +153,14 @@ class KindroidClient {
                                         console.log('✅ Story complete, final length:', fullAccumulated.length);
                                         // Update script area and end streaming mode
                                         this.updateScriptArea(fullAccumulated);
+                                        
+                                        // Flush any remaining content in the line buffer
+                                        if (lineBuffer.trim().length > 0 && window.game) {
+                                            console.log('📝 Flushing final content:', lineBuffer);
+                                            window.game.loadScript(lineBuffer + '\n', { append: true });
+                                            lineBuffer = '';
+                                        }
+                                        
                                         if (window.game) {
                                             window.game.streaming = false;
                                             window.game.resumeFromWaiting();

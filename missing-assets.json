@@ -37,5 +37,13 @@
     "mood": "neutral",
     "filename": "_neutral.png",
     "path": "resources/characters/_neutral.png"
+  },
+  {
+    "timestamp": "2025-06-06T13:53:48.555Z",
+    "type": "character",
+    "name": "ava",
+    "mood": "eager",
+    "filename": "ava_eager.png",
+    "path": "resources/characters/ava_eager.png"
   }
 ]
