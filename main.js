@@ -99,8 +99,12 @@ The ocean breeze carries the scent of salt and possibility between them.`;
     const savedDraft = localStorage.getItem('vn_script_draft');
     if (savedDraft && savedDraft.trim()) {
         scriptArea.value = savedDraft;
+        game.loadScript(savedDraft);
+        game.startPlayback();
     } else {
         scriptArea.value = exampleScript;
+        game.loadScript(exampleScript);
+        game.startPlayback();
     }
 }
 

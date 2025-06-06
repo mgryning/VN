@@ -48,12 +48,8 @@ body {
     padding: 20px;
     pointer-events: auto;
     backdrop-filter: blur(5px);
-    transform: translateY(100%);
-    transition: transform 0.3s ease;
-}
-
-#dialogue-box.visible {
     transform: translateY(0);
+    transition: transform 0.3s ease;
 }
 
 #character-name {

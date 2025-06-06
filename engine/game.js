@@ -21,6 +21,12 @@ class VisualNovelEngine {
         
         this.setupEventListeners();
         this.bindMobileControls();
+        
+        // Show dialogue box immediately with initial message
+        this.showDialogueBox();
+        this.characterName.textContent = '';
+        this.dialogueText.textContent = 'Load a script to begin your visual novel experience...';
+        this.hideContinueIndicator();
     }
     
     setupEventListeners() {
@@ -86,7 +92,10 @@ class VisualNovelEngine {
     loadScript(scriptText) {
         this.parser.parseScript(scriptText);
         this.scene.reset();
-        this.hideDialogue();
+        this.showDialogueBox();
+        this.characterName.textContent = '';
+        this.dialogueText.textContent = 'Click or press Space to begin...';
+        this.hideContinueIndicator();
         this.isPlaying = false;
     }
     
@@ -210,16 +219,18 @@ class VisualNovelEngine {
     
     endPlayback() {
         this.isPlaying = false;
-        this.hideDialogue();
+        this.characterName.textContent = '';
+        this.dialogueText.textContent = 'Story completed. Click to restart or load new script.';
+        this.hideContinueIndicator();
         console.log('Visual novel playback completed');
     }
     
     showDialogueBox() {
-        this.dialogueBox.classList.add('visible');
+        // Dialogue box is now always visible
     }
     
     hideDialogue() {
-        this.dialogueBox.classList.remove('visible');
+        // Dialogue box is now always visible
     }
     
     showContinueIndicator() {
