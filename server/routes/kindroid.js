@@ -184,16 +184,20 @@ router.post('/repeat-previous', async (req, res) => {
 
 // Helper function to check if we have basic setup information
 function hasBasicSetup(text) {
-    const hasLoc = text.includes('LOC:');
-    const hasCha = text.includes('CHA:');
-    const hasStp = text.includes('STP:');
+    // Check for complete lines with content, not just headers
+    const locMatch = text.match(/LOC:\s*(.+)/);
+    const chaMatch = text.match(/CHA:\s*(.+)/);
+    // STP must be a complete line ending with newline
+    const stpMatch = text.match(/STP:\s*(.+)\n/);
+    
+    const hasLoc = locMatch && locMatch[1].trim().length > 0;
+    const hasCha = chaMatch && chaMatch[1].trim().length > 0;
+    const hasStp = stpMatch && stpMatch[1].trim().length > 0;
     
     console.log('Setup check:', { hasLoc, hasCha, hasStp, textLength: text.length });
     
-    // We need at least LOC and either CHA or STP to start
-    // Also check we have some content after the setup
-    const hasContent = text.length > 20; // Basic sanity check
-    return hasLoc && (hasCha || hasStp) && hasContent;
+    // We need LOC, CHA, and STP with actual content to start
+    return hasLoc && hasCha && hasStp;
 }
 
 module.exports = router;

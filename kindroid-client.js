@@ -107,7 +107,7 @@ class KindroidClient {
                                             hasStartedDisplay = true;
                                             button.textContent = 'Loading Scene...';
                                             fullAccumulated = parsed.message;
-                                            console.log('🎬 Starting story with setup:', parsed.message.substring(0, 100) + '...');
+                                            console.log('🎬 Starting story with setup:', parsed.message);
                                             // Set streaming mode and load initial setup
                                             if (window.game) {
                                                 window.game.streaming = true;

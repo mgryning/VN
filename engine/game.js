@@ -105,7 +105,6 @@ class VisualNovelEngine {
                 return;
             }
             // Really at the end
-            this.endPlayback();
             return;
         }
         
@@ -203,8 +202,6 @@ class VisualNovelEngine {
         if (this.parser.hasNext()) {
             this.parser.getNextCommand();
             this.executeCurrentCommand();
-        } else {
-            this.endPlayback();
         }
     }
     
@@ -220,13 +217,6 @@ class VisualNovelEngine {
         }
     }
     
-    endPlayback() {
-        this.isPlaying = false;
-        this.characterName.textContent = '';
-        this.dialogueText.textContent = 'Story completed. Click to restart or load new script.';
-        this.hideContinueIndicator();
-        console.log('Visual novel playback completed');
-    }
     
     showDialogueBox() {
         // Dialogue box is now always visible
