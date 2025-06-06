@@ -31,7 +31,7 @@ class Scene {
         if (this.currentLocation !== command.location) {
             await this.renderer.fadeOut(300);
             this.currentLocation = command.location;
-            this.renderScene();
+            await this.renderScene();
             await this.renderer.fadeIn(300);
         }
         
@@ -39,41 +39,53 @@ class Scene {
     }
     
     async setCharacters(command) {
-        this.currentCharacters = command.characters;
-        this.renderScene();
+        this.currentCharacters = command.characters.filter(char => 
+            char.name.toLowerCase() !== 'morten'
+        );
+        await this.renderScene();
     }
     
     async renderDialogue(command) {
-        this.currentCharacters = command.characters || this.currentCharacters;
+        if (command.characters) {
+            this.currentCharacters = command.characters.filter(char => 
+                char.name.toLowerCase() !== 'morten'
+            );
+        }
         this.currentLocation = command.location || this.currentLocation;
-        this.renderScene();
+        await this.renderScene();
     }
     
     async renderAction(command) {
-        this.currentCharacters = command.characters || this.currentCharacters;
+        if (command.characters) {
+            this.currentCharacters = command.characters.filter(char => 
+                char.name.toLowerCase() !== 'morten'
+            );
+        }
         this.currentLocation = command.location || this.currentLocation;
-        this.renderScene();
+        await this.renderScene();
     }
     
-    renderScene() {
+    async renderScene() {
         this.renderer.clear();
         
         if (this.currentLocation) {
-            this.renderer.drawBackground(this.currentLocation);
+            await this.renderer.drawBackground(this.currentLocation);
         }
         
         if (this.currentCharacters && this.currentCharacters.length > 0) {
-            this.positionAndDrawCharacters();
+            await this.positionAndDrawCharacters();
         }
     }
     
-    positionAndDrawCharacters() {
+    async positionAndDrawCharacters() {
         const positions = this.calculateCharacterPositions(this.currentCharacters.length);
         
-        this.currentCharacters.forEach((character, index) => {
-            const position = positions[index];
-            this.renderer.drawCharacter(character.name, character.mood, position);
-        });
+        // Draw characters sequentially to avoid conflicts
+        for (let i = 0; i < this.currentCharacters.length; i++) {
+            const character = this.currentCharacters[i];
+            const position = positions[i];
+            await this.renderer.drawCharacter(character.name, character.mood, position);
+        }
     }
     
     calculateCharacterPositions(count) {
@@ -95,8 +107,8 @@ class Scene {
         }
     }
     
-    highlightCharacter(characterName) {
-        this.renderScene();
+    async highlightCharacter(characterName) {
+        await this.renderScene();
         
         const character = this.currentCharacters.find(char => 
             char.name.toLowerCase() === characterName.toLowerCase()

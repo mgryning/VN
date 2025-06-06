@@ -10,6 +10,7 @@ A modern web-based visual novel engine with AI-powered story generation, charact
 - **Character mood system** with visual representations
 - **Scene management** with transitions and animations
 - **Mobile-friendly controls** (touch, swipe, responsive UI)
+- **Automatic image loading** for backgrounds from resources folder
 
 ### AI Integration
 - **Story generation** from prompts with genre selection
@@ -80,6 +81,13 @@ npm start
 2. **Generate Tab**: Create new stories from prompts
 3. **Chat Tab**: Have conversations with characters
 4. **Enhance Tab**: Validate, format, and enhance existing scripts
+
+### Background Images
+1. Create a `resources/backgrounds/` folder in your project
+2. Add PNG background images named after your locations
+3. For `LOC: beach`, add `beach.png`
+4. Images automatically load and scale to fit the screen
+5. Falls back to gradient backgrounds if no image is found
 
 ### Mobile Support
 - Touch controls for navigation

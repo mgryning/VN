@@ -119,7 +119,7 @@ class VisualNovelEngine {
         
         if (this.currentCommand.type === 'dialogue') {
             this.showDialogue(this.currentCommand);
-            this.scene.highlightCharacter(this.currentCommand.speaker);
+            await this.scene.highlightCharacter(this.currentCommand.speaker);
         } else if (this.currentCommand.type === 'action') {
             this.showAction(this.currentCommand);
         } else {
@@ -242,7 +242,7 @@ class VisualNovelEngine {
     }
     
     handleClick(e) {
-        if (e.target.closest('#script-input') || e.target.closest('#controls')) {
+        if (e.target.closest('#script-input')) {
             return;
         }
         
@@ -273,14 +273,11 @@ class VisualNovelEngine {
             case 'A':
                 this.toggleAutoMode();
                 break;
-            case 'Escape':
-                this.toggleMenu();
-                break;
         }
     }
     
     handleTouch(e) {
-        if (e.target.closest('#script-input') || e.target.closest('#controls')) {
+        if (e.target.closest('#script-input')) {
             return;
         }
         
@@ -295,10 +292,6 @@ class VisualNovelEngine {
         console.log('Auto mode:', this.autoMode ? 'ON' : 'OFF');
     }
     
-    toggleMenu() {
-        const scriptInput = document.getElementById('script-input');
-        scriptInput.style.display = scriptInput.style.display === 'none' ? 'block' : 'none';
-    }
     
     getGameState() {
         return {

@@ -2,8 +2,8 @@ class Renderer {
     constructor(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
-        this.width = 1920;
-        this.height = 1080;
+        this.width = 0;  // Will be set by updateCanvasSize
+        this.height = 0; // Will be set by updateCanvasSize
         this.scale = 1;
         
         this.backgrounds = new Map();
@@ -25,25 +25,16 @@ class Renderer {
         const containerWidth = container.clientWidth;
         const containerHeight = container.clientHeight;
         
-        const aspectRatio = this.width / this.height;
-        const containerAspectRatio = containerWidth / containerHeight;
-        
-        let canvasWidth, canvasHeight;
-        
-        if (containerAspectRatio > aspectRatio) {
-            canvasHeight = containerHeight;
-            canvasWidth = canvasHeight * aspectRatio;
-        } else {
-            canvasWidth = containerWidth;
-            canvasHeight = canvasWidth / aspectRatio;
-        }
+        // Use full container size instead of maintaining fixed aspect ratio
+        this.width = containerWidth;
+        this.height = containerHeight;
         
         this.canvas.width = this.width;
         this.canvas.height = this.height;
-        this.canvas.style.width = canvasWidth + 'px';
-        this.canvas.style.height = canvasHeight + 'px';
+        this.canvas.style.width = this.width + 'px';
+        this.canvas.style.height = this.height + 'px';
         
-        this.scale = canvasWidth / this.width;
+        this.scale = 1;
     }
     
     bindEvents() {
@@ -185,22 +176,91 @@ class Renderer {
         this.ctx.clearRect(0, 0, this.width, this.height);
     }
     
-    drawBackground(backgroundKey) {
+    async drawBackground(backgroundKey) {
         let bg = this.backgrounds.get(backgroundKey);
         if (!bg) {
-            bg = this.createGradientBackground();
+            bg = await this.createBackground(backgroundKey);
             this.backgrounds.set(backgroundKey, bg);
         }
         
         this.ctx.drawImage(bg, 0, 0, this.width, this.height);
     }
     
-    drawCharacter(name, mood, position = 'center') {
+    async createBackground(locationName) {
+        // Try to load PNG images from resources folder first
+        const possiblePaths = [
+            `resources/backgrounds/${locationName}.png`,
+            `resources/backgrounds/${locationName.toLowerCase()}.png`,
+            `resources/backgrounds/${locationName.replace('_', '-')}.png`,
+            `resources/backgrounds/${locationName.replace('_', ' ')}.png`
+        ];
+        
+        for (const imagePath of possiblePaths) {
+            try {
+                const img = await this.loadImage(imagePath);
+                console.log(`✅ Loaded background image: ${imagePath}`);
+                return this.createImageBackground(img);
+            } catch (error) {
+                // Image not found, try next path
+            }
+        }
+        
+        // Fallback to gradient background if no image found
+        console.log(`⚠️ No background PNG found for '${locationName}', using gradient fallback`);
+        const colors = this.getBackgroundColorsForLocation(locationName);
+        return this.createGradientBackground(colors);
+    }
+    
+    createImageBackground(img) {
+        const canvas = document.createElement('canvas');
+        canvas.width = this.width;
+        canvas.height = this.height;
+        const ctx = canvas.getContext('2d');
+        
+        // Calculate scaling to cover the entire canvas while maintaining aspect ratio
+        const imgAspectRatio = img.width / img.height;
+        const canvasAspectRatio = this.width / this.height;
+        
+        let drawWidth, drawHeight, offsetX = 0, offsetY = 0;
+        
+        if (imgAspectRatio > canvasAspectRatio) {
+            // Image is wider than canvas
+            drawHeight = this.height;
+            drawWidth = drawHeight * imgAspectRatio;
+            offsetX = (this.width - drawWidth) / 2;
+        } else {
+            // Image is taller than canvas
+            drawWidth = this.width;
+            drawHeight = drawWidth / imgAspectRatio;
+            offsetY = (this.height - drawHeight) / 2;
+        }
+        
+        ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+        
+        return canvas;
+    }
+    
+    getBackgroundColorsForLocation(locationName) {
+        const locationBackgrounds = {
+            'forest_clearing': ['#228B22', '#90EE90'],
+            'castle_hall': ['#8B4513', '#DAA520'],
+            'beach': ['#87CEEB', '#F0E68C', '#FFE4B5'],
+            'mountain': ['#696969', '#C0C0C0'],
+            'city': ['#708090', '#2F4F4F'],
+            'room': ['#DEB887', '#F5DEB3'],
+            'library': ['#8B4513', '#DEB887'],
+            'garden': ['#9ACD32', '#98FB98']
+        };
+        
+        return locationBackgrounds[locationName] || ['#87CEEB', '#FFB6C1'];
+    }
+    
+    async drawCharacter(name, mood, position = 'center') {
         const key = `${name}_${mood}`;
         let character = this.characters.get(key);
         
         if (!character) {
-            character = this.createCharacterPlaceholder(name, mood);
+            character = await this.createCharacter(name, mood);
             this.characters.set(key, character);
         }
         
@@ -222,12 +282,65 @@ class Renderer {
                 break;
         }
         
-        y = this.height - charHeight - 200;
+        // Position character bottom to align with dialogue box top
+        const dialogueBox = document.getElementById('dialogue-box');
+        let dialogueBoxTop = this.height - 160; // fallback
+        
+        if (dialogueBox) {
+            const rect = dialogueBox.getBoundingClientRect();
+            const canvasRect = this.canvas.getBoundingClientRect();
+            // Convert dialogue box position to canvas coordinates
+            dialogueBoxTop = (rect.top - canvasRect.top) * (this.height / canvasRect.height);
+        }
+        
+        y = dialogueBoxTop - charHeight;
         
         this.ctx.save();
-        this.ctx.globalAlpha = 0.9;
+        this.ctx.globalAlpha = 1.0;
         this.ctx.drawImage(character, x, y, charWidth, charHeight);
         this.ctx.restore();
+    }
+    
+    async createCharacter(name, mood) {
+        // Try to load character image from resources folder first
+        const possiblePaths = [
+            `resources/characters/${name}_${mood}.png`,
+            `resources/characters/${name.toLowerCase()}_${mood.toLowerCase()}.png`,
+            `resources/characters/${name}_${mood.toLowerCase()}.png`,
+            `resources/characters/${name.toLowerCase()}_${mood}.png`,
+            `resources/characters/${name}.png`,
+            `resources/characters/${name.toLowerCase()}.png`
+        ];
+        
+        for (const imagePath of possiblePaths) {
+            try {
+                const img = await this.loadImage(imagePath);
+                console.log(`✅ Loaded character image: ${imagePath}`);
+                return this.createCharacterImage(img);
+            } catch (error) {
+                // Image not found, try next path
+            }
+        }
+        
+        // Fallback to placeholder if no image found
+        console.log(`⚠️ No character PNG found for '${name}/${mood}', using placeholder`);
+        return this.createCharacterPlaceholder(name, mood);
+    }
+    
+    createCharacterImage(img) {
+        const canvas = document.createElement('canvas');
+        const targetHeight = Math.min(600, this.height * 0.8);
+        const aspectRatio = img.width / img.height;
+        const targetWidth = targetHeight * aspectRatio;
+        
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        const ctx = canvas.getContext('2d');
+        
+        // Draw the character image
+        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+        
+        return canvas;
     }
     
     drawText(text, x, y, options = {}) {
