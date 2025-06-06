@@ -5,6 +5,9 @@ class KindroidClient {
         this.sceneSetupComplete = false;
         this.isTestMode = options.testMode || false;
         this.testResults = {};
+        this.dialogueBoxObserver = null;
+        this.positionCheckInterval = null;
+        this.windowResizeHandler = null;
         
         if (!this.isTestMode && typeof window !== 'undefined') {
             this.setupUI();
@@ -383,7 +386,74 @@ class KindroidClient {
         const container = document.getElementById('stp-options-container');
         if (container) {
             container.setAttribute('data-persistent', 'true');
+            
+            // Set up monitoring for dialogue box changes
+            this.setupDialogueBoxMonitoring();
         }
+    }
+
+    setupDialogueBoxMonitoring() {
+        const dialogueBox = document.querySelector('.dialogue-box, #dialogue-box, .story-box, #story-box') || 
+                           document.querySelector('[class*="dialogue"], [class*="story"], [id*="dialogue"], [id*="story"]');
+        
+        if (!dialogueBox) {
+            console.log('⚠️ No dialogue box found for monitoring');
+            return;
+        }
+
+        // Use ResizeObserver if available (modern browsers)
+        if (window.ResizeObserver) {
+            this.dialogueBoxObserver = new ResizeObserver((entries) => {
+                this.updateInputPanelPosition();
+            });
+            this.dialogueBoxObserver.observe(dialogueBox);
+            console.log('✅ ResizeObserver monitoring dialogue box changes');
+        } else {
+            // Fallback: Use MutationObserver and periodic checks
+            this.dialogueBoxObserver = new MutationObserver(() => {
+                this.updateInputPanelPosition();
+            });
+            this.dialogueBoxObserver.observe(dialogueBox, {
+                attributes: true,
+                attributeFilter: ['style', 'class'],
+                subtree: true
+            });
+            
+            // Also do periodic checks as fallback
+            this.positionCheckInterval = setInterval(() => {
+                this.updateInputPanelPosition();
+            }, 500);
+            
+            console.log('✅ MutationObserver + periodic monitoring dialogue box changes');
+        }
+
+        // Also listen for window resize
+        this.windowResizeHandler = () => {
+            setTimeout(() => this.updateInputPanelPosition(), 100);
+        };
+        window.addEventListener('resize', this.windowResizeHandler);
+    }
+
+    updateInputPanelPosition() {
+        const container = document.getElementById('stp-options-container');
+        const dialogueBox = document.querySelector('.dialogue-box, #dialogue-box, .story-box, #story-box') || 
+                           document.querySelector('[class*="dialogue"], [class*="story"], [id*="dialogue"], [id*="story"]');
+        
+        if (!container || !dialogueBox) {
+            return;
+        }
+
+        // Update positioning based on current dialogue box dimensions
+        console.log('📐 Updating input panel position:', {
+            left: dialogueBox.offsetLeft,
+            top: dialogueBox.offsetTop,
+            width: dialogueBox.offsetWidth,
+            height: dialogueBox.offsetHeight
+        });
+
+        container.style.top = `${dialogueBox.offsetTop - 60}px`;
+        container.style.left = `${dialogueBox.offsetLeft}px`;
+        container.style.width = `${dialogueBox.offsetWidth}px`;
     }
 
     createTestStpOptions() {
@@ -787,6 +857,26 @@ class KindroidClient {
                 }
             }, 300);
         }, 4000);
+    }
+
+    // Cleanup method to remove observers and listeners
+    cleanup() {
+        if (this.dialogueBoxObserver) {
+            this.dialogueBoxObserver.disconnect();
+            this.dialogueBoxObserver = null;
+        }
+        
+        if (this.positionCheckInterval) {
+            clearInterval(this.positionCheckInterval);
+            this.positionCheckInterval = null;
+        }
+        
+        if (this.windowResizeHandler) {
+            window.removeEventListener('resize', this.windowResizeHandler);
+            this.windowResizeHandler = null;
+        }
+        
+        console.log('🧹 Cleaned up dialogue box monitoring');
     }
 }
 
