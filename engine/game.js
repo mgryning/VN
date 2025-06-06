@@ -18,6 +18,8 @@ class VisualNovelEngine {
         this.currentCommand = null;
         this.typewriterInterval = null;
         this.isTyping = false;
+        this.streaming = false;   // true while SSE connection is open
+        this.waitingMore = false; // true when we've reached end but streaming continues
         
         this.setupEventListeners();
         this.bindMobileControls();
@@ -67,14 +69,22 @@ class VisualNovelEngine {
     }
     
     
-    loadScript(scriptText) {
-        this.parser.parseScript(scriptText);
-        this.scene.reset();
-        this.showDialogueBox();
-        this.characterName.textContent = '';
-        this.dialogueText.textContent = 'Click or press Space to begin...';
-        this.hideContinueIndicator();
-        this.isPlaying = false;
+    loadScript(scriptText, options = {}) {
+        const { append = false } = options;
+        
+        if (append) {
+            // Append new commands to existing script
+            this.parser.appendScript(scriptText);
+        } else {
+            // Replace script entirely
+            this.parser.parseScript(scriptText);
+            this.scene.reset();
+            this.showDialogueBox();
+            this.characterName.textContent = '';
+            this.dialogueText.textContent = 'Click or press Space to begin...';
+            this.hideContinueIndicator();
+            this.isPlaying = false;
+        }
     }
     
     startPlayback() {
@@ -89,9 +99,18 @@ class VisualNovelEngine {
         this.currentCommand = this.parser.getCurrentCommand();
         
         if (!this.currentCommand) {
-            this.isPlaying = false;
+            if (this.streaming) {
+                // We've reached the end but more content is coming
+                this.waitingMore = true;
+                return;
+            }
+            // Really at the end
+            this.endPlayback();
             return;
         }
+        
+        // If we were waiting and now have a command, continue
+        this.waitingMore = false;
         
         await this.scene.renderCommand(this.currentCommand);
         
@@ -104,7 +123,10 @@ class VisualNovelEngine {
             // since they don't provide new story content
             this.nextCommand();
         } else {
-            if (this.autoMode) {
+            // Auto-advance through all commands during streaming
+            if (this.streaming) {
+                setTimeout(() => this.nextCommand(), 100);
+            } else if (this.autoMode) {
                 setTimeout(() => this.nextCommand(), 1000);
             }
         }
@@ -117,8 +139,8 @@ class VisualNovelEngine {
         
         this.typeText(command.text, () => {
             this.showContinueIndicator();
-            if (this.autoMode) {
-                setTimeout(() => this.nextCommand(), this.autoSpeed);
+            if (this.streaming || this.autoMode) {
+                setTimeout(() => this.nextCommand(), this.streaming ? 1500 : this.autoSpeed);
             }
         });
     }
@@ -130,8 +152,8 @@ class VisualNovelEngine {
         
         this.typeText(command.text, () => {
             this.showContinueIndicator();
-            if (this.autoMode) {
-                setTimeout(() => this.nextCommand(), this.autoSpeed);
+            if (this.streaming || this.autoMode) {
+                setTimeout(() => this.nextCommand(), this.streaming ? 1500 : this.autoSpeed);
             }
         });
     }
@@ -273,6 +295,13 @@ class VisualNovelEngine {
     toggleAutoMode() {
         this.autoMode = !this.autoMode;
         console.log('Auto mode:', this.autoMode ? 'ON' : 'OFF');
+    }
+    
+    resumeFromWaiting() {
+        if (this.waitingMore) {
+            this.waitingMore = false;
+            this.executeCurrentCommand();
+        }
     }
     
     

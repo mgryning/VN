@@ -21,5 +21,21 @@
     "name": "secluded cove",
     "filename": "secluded cove.png",
     "path": "resources/backgrounds/secluded cove.png"
+  },
+  {
+    "timestamp": "2025-06-06T13:38:50.840Z",
+    "type": "character",
+    "name": "mort",
+    "mood": "neutral",
+    "filename": "mort_neutral.png",
+    "path": "resources/characters/mort_neutral.png"
+  },
+  {
+    "timestamp": "2025-06-06T13:41:15.780Z",
+    "type": "character",
+    "name": "",
+    "mood": "neutral",
+    "filename": "_neutral.png",
+    "path": "resources/characters/_neutral.png"
   }
 ]

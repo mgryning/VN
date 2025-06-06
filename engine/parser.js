@@ -38,6 +38,50 @@ class ScriptParser {
         return this.commands;
     }
     
+    appendScript(scriptText) {
+        const lines = scriptText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+        
+        // Get current state for context
+        let currentLocation = null;
+        let currentCharacters = [];
+        
+        // Find the last location and characters from existing commands
+        for (let i = this.commands.length - 1; i >= 0; i--) {
+            const cmd = this.commands[i];
+            if (cmd.location && !currentLocation) {
+                currentLocation = cmd.location;
+            }
+            if (cmd.characters && cmd.characters.length > 0 && currentCharacters.length === 0) {
+                currentCharacters = [...cmd.characters];
+            }
+            if (currentLocation && currentCharacters.length > 0) break;
+        }
+        
+        // Parse new lines and append to existing commands
+        for (const line of lines) {
+            const command = this.parseLine(line, currentLocation, currentCharacters);
+            
+            if (command) {
+                if (command.type === 'location') {
+                    currentLocation = command.location;
+                } else if (command.type === 'characters') {
+                    currentCharacters = command.characters;
+                } else if (command.type === 'dialogue' || command.type === 'action') {
+                    command.location = currentLocation;
+                    command.characters = [...currentCharacters];
+                } else if (command.type === 'stp') {
+                    // Store STP actions but don't add to commands
+                    this.storyTransitionPoints = command.actions;
+                    continue;
+                }
+                
+                this.commands.push(command);
+            }
+        }
+        
+        return this.commands;
+    }
+    
     parseLine(line, currentLocation, currentCharacters) {
         line = line.trim();
         

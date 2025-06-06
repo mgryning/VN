@@ -107,8 +107,19 @@ class KindroidClient {
                                             button.textContent = 'Loading Scene...';
                                             fullAccumulated = parsed.message;
                                             console.log('🎬 Starting story with setup:', parsed.message.substring(0, 100) + '...');
-                                            this.parseAndLoadStoryPartial(parsed.message);
-                                            this.showNotification('Scene setup received, starting story...', 'info');
+                                            // Set streaming mode and load initial setup
+                                            if (window.game) {
+                                                window.game.streaming = true;
+                                                window.game.loadScript(parsed.message);
+                                                window.game.startPlayback();
+                                                // Clear the "click to begin" message
+                                                setTimeout(() => {
+                                                    if (window.game.dialogueText) {
+                                                        window.game.dialogueText.textContent = '';
+                                                        window.game.characterName.textContent = '';
+                                                    }
+                                                }, 100);
+                                            }
                                         }
                                         break;
                                         
@@ -116,16 +127,23 @@ class KindroidClient {
                                         fullAccumulated += parsed.message;
                                         // Update the script area with latest content
                                         this.updateScriptArea(fullAccumulated);
-                                        // Try to incrementally update the story display
-                                        this.tryIncrementalUpdate(fullAccumulated);
+                                        // Append new content to the game engine
+                                        if (window.game) {
+                                            window.game.loadScript(parsed.message, { append: true });
+                                            window.game.resumeFromWaiting();
+                                        }
                                         console.log('📝 Added chunk, total length:', fullAccumulated.length);
                                         break;
                                         
                                     case 'done':
                                         fullAccumulated = parsed.message;
                                         console.log('✅ Story complete, final length:', fullAccumulated.length);
-                                        this.finalizeStory(fullAccumulated);
-                                        this.showNotification('AI story completed!', 'success');
+                                        // Update script area and end streaming mode
+                                        this.updateScriptArea(fullAccumulated);
+                                        if (window.game) {
+                                            window.game.streaming = false;
+                                            window.game.resumeFromWaiting();
+                                        }
                                         return;
                                         
                                     case 'error':
@@ -157,60 +175,6 @@ class KindroidClient {
         }
     }
 
-    parseAndLoadStory(aiResponse) {
-        // Load the AI response into the script area
-        const scriptArea = document.getElementById('script-area');
-        if (scriptArea) {
-            scriptArea.value = aiResponse;
-            
-            // Auto-execute the script if the game engine is available
-            if (window.game) {
-                try {
-                    window.game.loadScript(aiResponse);
-                    window.game.startPlayback();
-                    
-                    // Auto-advance to first dialogue/action if available
-                    setTimeout(() => {
-                        this.autoAdvanceToFirstContent();
-                    }, 100);
-                } catch (error) {
-                    console.error('Failed to load AI story:', error);
-                    this.showNotification('AI story loaded but failed to parse. Check script format.', 'warning');
-                }
-            }
-        }
-    }
-
-    parseAndLoadStoryPartial(partialResponse) {
-        // Load partial response and start scene setup
-        const scriptArea = document.getElementById('script-area');
-        if (scriptArea) {
-            scriptArea.value = partialResponse;
-            
-            // Start loading the scene with whatever we have
-            if (window.game) {
-                try {
-                    window.game.loadScript(partialResponse);
-                    window.game.startPlayback();
-                    
-                    // Auto-advance to show the scene setup
-                    setTimeout(() => {
-                        this.autoAdvanceToFirstContent();
-                    }, 100);
-                    
-                    // Show streaming indicator in dialogue
-                    setTimeout(() => {
-                        if (window.game.dialogueText) {
-                            window.game.dialogueText.textContent = 'AI is generating your story...';
-                            window.game.characterName.textContent = 'Kindroid AI';
-                        }
-                    }, 200);
-                } catch (error) {
-                    console.error('Failed to load partial story:', error);
-                }
-            }
-        }
-    }
 
     updateScriptArea(fullMessage) {
         // Update the script area with the latest content
@@ -233,75 +197,9 @@ class KindroidClient {
                 line.trim().length > 10
             );
             
-            if (textLines.length > 0) {
-                const previewText = textLines[textLines.length - 1].trim();
-                if (previewText.length > 10) {
-                    window.game.dialogueText.textContent = `📝 ${previewText}...`;
-                    window.game.characterName.textContent = 'AI Writing';
-                }
-            }
         }
     }
 
-    finalizeStory(fullMessage) {
-        // Final load with complete story
-        const scriptArea = document.getElementById('script-area');
-        if (scriptArea) {
-            scriptArea.value = fullMessage;
-            
-            // Reload the complete script
-            if (window.game) {
-                try {
-                    window.game.loadScript(fullMessage);
-                    window.game.startPlayback();
-                    
-                    // Auto-advance to first dialogue/action
-                    setTimeout(() => {
-                        this.autoAdvanceToFirstContent();
-                    }, 100);
-                } catch (error) {
-                    console.error('Failed to finalize story:', error);
-                    this.showNotification('Story completed but failed to reload. Check script format.', 'warning');
-                }
-            }
-        }
-    }
-
-    autoAdvanceToFirstContent() {
-        if (window.game && window.game.isPlaying) {
-            // Keep advancing until we hit dialogue or action content
-            const maxAttempts = 10; // Prevent infinite loops
-            let attempts = 0;
-            
-            const advanceToContent = () => {
-                attempts++;
-                
-                if (attempts > maxAttempts) {
-                    console.warn('Max attempts reached while auto-advancing');
-                    return;
-                }
-                
-                const currentCommand = window.game.currentCommand;
-                
-                // If no command yet, or it's just location/character setup, advance
-                if (!currentCommand || 
-                    currentCommand.type === 'location' || 
-                    currentCommand.type === 'characters') {
-                    
-                    if (window.game.parser.hasNext()) {
-                        window.game.nextCommand();
-                        // Continue checking after a brief delay
-                        setTimeout(advanceToContent, 50);
-                    }
-                } else if (currentCommand.type === 'dialogue' || currentCommand.type === 'action') {
-                    // We've reached actual content, stop auto-advancing
-                    console.log('Auto-advanced to first content:', currentCommand.type);
-                }
-            };
-            
-            advanceToContent();
-        }
-    }
 
     showNotification(message, type = 'info') {
         const notification = document.createElement('div');
