@@ -391,11 +391,7 @@ class Renderer {
     async createCharacter(name, mood) {
         // Try to load character image from resources folder first
         const possiblePaths = [
-            `resources/characters/${name}_${mood}.png`,
             `resources/characters/${name.toLowerCase()}_${mood.toLowerCase()}.png`,
-            `resources/characters/${name}_${mood.toLowerCase()}.png`,
-            `resources/characters/${name.toLowerCase()}_${mood}.png`,
-            `resources/characters/${name}.png`,
             `resources/characters/${name.toLowerCase()}.png`
         ];
         
