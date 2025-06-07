@@ -13,10 +13,6 @@ class KindroidClient {
             this.setupUI();
             // Create persistent input panel immediately
             this.createPersistentInputPanel();
-            // Add temporary test buttons after a short delay  
-            setTimeout(() => {
-                this.createTestStpOptions();
-            }, 2000);
         }
     }
 
@@ -456,19 +452,6 @@ class KindroidClient {
         container.style.width = `${dialogueBox.offsetWidth}px`;
     }
 
-    createTestStpOptions() {
-        // Create test options to see positioning
-        console.log('🧪 Adding test STP options to existing panel');
-        const testOptions = ['Say hello', 'Walk away'];
-        
-        // Update the existing panel with test options
-        this.updateStpOptions(testOptions);
-        
-        // Remove test options after 10 seconds, but keep the input panel
-        setTimeout(() => {
-            this.updateStpOptions([]);
-        }, 10000);
-    }
 
     displayStpOptions(fullAccumulated) {
         if (this.isTestMode || typeof window === 'undefined') {
