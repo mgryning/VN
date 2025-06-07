@@ -51,13 +51,13 @@ class KindroidClient {
 
         // Add click handler
         kindroidBtn.addEventListener('click', () => {
-            this.requestStoryFromAI();
+            this.requestMessageFromKindroid();
         });
 
         document.body.appendChild(kindroidBtn);
     }
 
-    async requestStoryFromAI(message = null) {
+    async requestMessageFromKindroid(message = null) {
         // Browser-specific UI updates
         let button, originalText;
         if (!this.isTestMode && typeof window !== 'undefined') {
@@ -787,7 +787,7 @@ class KindroidClient {
         this.showNotification(`Sending: ${text}`, 'info');
         
         // Send the user's message to Kindroid AI like the "Get AI Story" button
-        await this.requestStoryFromAI(text);
+        await this.requestMessageFromKindroid(text);
     }
 
 
