@@ -57,7 +57,7 @@ class KindroidClient {
         document.body.appendChild(kindroidBtn);
     }
 
-    async requestStoryFromAI() {
+    async requestStoryFromAI(message = null) {
         // Browser-specific UI updates
         let button, originalText;
         if (!this.isTestMode && typeof window !== 'undefined') {
@@ -88,12 +88,14 @@ class KindroidClient {
 
             // Set up fetch with streaming
             const fetchFn = typeof fetch !== 'undefined' ? fetch : require('node-fetch');
+            const requestBody = message ? { message } : {};
             const response = await fetchFn(`${this.baseURL}/api/kindroid/send-kindroid-message`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'text/event-stream'
-                }
+                },
+                body: JSON.stringify(requestBody)
             });
 
             if (!response.ok) {
@@ -785,96 +787,9 @@ class KindroidClient {
         this.showNotification(`Sending: ${text}`, 'info');
         
         // Send the user's message to Kindroid AI like the "Get AI Story" button
-        await this.sendCustomMessageToAI(text);
+        await this.requestStoryFromAI(text);
     }
 
-    async sendCustomMessageToAI(userMessage) {
-        // Browser-specific UI updates
-        let button, originalText;
-        if (!this.isTestMode && typeof window !== 'undefined') {
-            button = document.getElementById('kindroid-btn');
-            if (button) {
-                originalText = button.textContent;
-                button.textContent = 'Processing Message...';
-                button.disabled = true;
-                button.style.background = '#9ca3af';
-            }
-        }
-        
-        try {
-            // Reset state
-            this.streamAccumulator = '';
-            this.sceneSetupComplete = false;
-            if (this.isTestMode) {
-                this.testResults = {
-                    streamingStarted: true,
-                    sceneSetupCompleted: false,
-                    directStreamingActivated: false,
-                    storyContentReceived: false,
-                    finalStoryLength: 0,
-                    locationLength: 0,
-                    charactersLength: 0,
-                    setupLength: 0,
-                    error: null
-                };
-            }
-
-            // Send custom message to Kindroid AI
-            const fetchFn = typeof fetch !== 'undefined' ? fetch : require('node-fetch');
-            const response = await fetchFn(`${this.baseURL}/api/kindroid/send-kindroid-message`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'text/event-stream'
-                },
-                body: JSON.stringify({
-                    message: userMessage,
-                    stream: true
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            // Check if this is a streaming response or regular JSON
-            const contentType = response.headers.get('content-type');
-            if (contentType && contentType.includes('text/event-stream')) {
-                // Handle streaming response (same as requestStoryFromAI)
-                await this.handleStreamingResponse(response);
-            } else {
-                // Handle regular JSON response
-                const data = await response.json();
-                if (data.success && data.message) {
-                    // Process the message as if it came from streaming
-                    this.processAIMessage(data.message);
-                } else {
-                    throw new Error(data.error || 'Failed to get AI response');
-                }
-            }
-
-        } catch (error) {
-            console.error('Custom message failed:', error);
-            if (this.isTestMode) {
-                this.testResults.error = error.message;
-            } else {
-                this.showNotification(`Failed to send message: ${error.message}`, 'error');
-            }
-        } finally {
-            if (this.isTestMode) {
-                this.testResults.finalStoryLength = this.streamAccumulator?.length || 0;
-            }
-            
-            // Reset button state after a delay (browser only)
-            if (!this.isTestMode && button) {
-                setTimeout(() => {
-                    button.textContent = originalText || 'Get AI Story';
-                    button.disabled = false;
-                    button.style.background = '#6366f1';
-                }, 1000);
-            }
-        }
-    }
 
     async handleStreamingResponse(response) {
         const reader = response.body.getReader();

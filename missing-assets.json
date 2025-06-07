@@ -61,5 +61,13 @@
     "mood": "confused",
     "filename": "ava_confused.png",
     "path": "resources/characters/ava_confused.png"
+  },
+  {
+    "timestamp": "2025-06-07T18:52:15.336Z",
+    "type": "character",
+    "name": "ava",
+    "mood": "relieved",
+    "filename": "ava_relieved.png",
+    "path": "resources/characters/ava_relieved.png"
   }
 ]
