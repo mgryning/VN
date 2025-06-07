@@ -69,5 +69,35 @@
     "mood": "relieved",
     "filename": "ava_relieved.png",
     "path": "resources/characters/ava_relieved.png"
+  },
+  {
+    "timestamp": "2025-06-07T19:01:51.326Z",
+    "type": "background",
+    "name": "a beautiful beach at sunset with waves gently lapping the shore",
+    "filename": "a beautiful beach at sunset with waves gently lapping the shore.png",
+    "path": "resources/backgrounds/a beautiful beach at sunset with waves gently lapping the shore.png"
+  },
+  {
+    "timestamp": "2025-06-07T19:01:51.758Z",
+    "type": "character",
+    "name": "ava stands with her long hair flowing in the sea breeze",
+    "mood": "neutral",
+    "filename": "ava stands with her long hair flowing in the sea breeze_neutral.png",
+    "path": "resources/characters/ava stands with her long hair flowing in the sea breeze_neutral.png"
+  },
+  {
+    "timestamp": "2025-06-07T19:01:51.782Z",
+    "type": "character",
+    "name": "wearing a flowing summer dress",
+    "mood": "neutral",
+    "filename": "wearing a flowing summer dress_neutral.png",
+    "path": "resources/characters/wearing a flowing summer dress_neutral.png"
+  },
+  {
+    "timestamp": "2025-06-07T19:22:31.260Z",
+    "type": "background",
+    "name": "secluded cove with bioluminescent pools glowing under starlight",
+    "filename": "secluded cove with bioluminescent pools glowing under starlight.png",
+    "path": "resources/backgrounds/secluded cove with bioluminescent pools glowing under starlight.png"
   }
 ]

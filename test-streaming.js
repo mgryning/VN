@@ -4,7 +4,7 @@
  * Node.js Test for Direct Streaming Implementation
  * 
  * This test verifies that:
- * 1. The requestStoryFromAI method can be called successfully
+ * 1. The requestMessageFromKindroid method can be called successfully
  * 2. Streaming starts and completes
  * 3. Scene setup is completed (LOC/CHA/STP processing)
  * 4. Direct streaming mode is activated after setup
@@ -151,7 +151,7 @@ class StreamingTest {
         
         // Extract port from server output
         const portMatch = this.serverOutput.match(/running on port (\d+)/);
-        const port = portMatch ? portMatch[1] : '3000';
+        const port = portMatch ? portMatch[1] : '3500';
         const healthUrl = `http://localhost:${port}/api/health`;
         
         for (let i = 0; i < 10; i++) {
@@ -186,7 +186,7 @@ class StreamingTest {
 
             // Extract port from server output
             const portMatch = this.serverOutput.match(/running on port (\d+)/);
-            const port = portMatch ? portMatch[1] : '3000';
+            const port = portMatch ? portMatch[1] : '3500';
             const baseURL = `http://localhost:${port}`;
             
             this.log(`🔌 Using server at ${baseURL}`);
@@ -201,11 +201,11 @@ class StreamingTest {
             this.assert(client.isTestMode === true, 'Client initialized in test mode');
             this.assert(client.baseURL === baseURL, 'Base URL set correctly');
 
-            // Test the requestStoryFromAI method
-            this.log('📞 Calling requestStoryFromAI()...');
+            // Test the requestMessageFromKindroid method
+            this.log('📞 Calling requestMessageFromKindroid()...');
             
             const startTime = Date.now();
-            await client.requestStoryFromAI();
+            await client.requestMessageFromKindroid();
             const endTime = Date.now();
             const duration = endTime - startTime;
 

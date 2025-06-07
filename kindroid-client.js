@@ -55,9 +55,48 @@ class KindroidClient {
         });
 
         document.body.appendChild(kindroidBtn);
+
+        // Create Mock button
+        const mockBtn = document.createElement('button');
+        mockBtn.id = 'mock-btn';
+        mockBtn.textContent = 'Mock Story';
+        mockBtn.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 160px;
+            background: #f59e0b;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            z-index: 1000;
+            font-size: 14px;
+            box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+            transition: all 0.2s ease;
+        `;
+
+        // Add hover effect for mock button
+        mockBtn.addEventListener('mouseenter', () => {
+            mockBtn.style.background = '#d97706';
+            mockBtn.style.transform = 'translateY(-1px)';
+        });
+
+        mockBtn.addEventListener('mouseleave', () => {
+            mockBtn.style.background = '#f59e0b';
+            mockBtn.style.transform = 'translateY(0)';
+        });
+
+        // Add click handler for mock button
+        mockBtn.addEventListener('click', () => {
+            this.requestMessageFromKindroid(null, true);
+        });
+
+        document.body.appendChild(mockBtn);
     }
 
-    async requestMessageFromKindroid(message = null) {
+    async requestMessageFromKindroid(message = null, useMock = false) {
         // Browser-specific UI updates
         let button, originalText;
         if (!this.isTestMode && typeof window !== 'undefined') {
@@ -88,7 +127,7 @@ class KindroidClient {
 
             // Set up fetch with streaming
             const fetchFn = typeof fetch !== 'undefined' ? fetch : require('node-fetch');
-            const requestBody = message ? { message } : {};
+            const requestBody = message ? { message, mock: useMock } : { mock: useMock };
             const response = await fetchFn(`${this.baseURL}/api/kindroid/send-kindroid-message`, {
                 method: 'POST',
                 headers: {
