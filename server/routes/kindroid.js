@@ -12,6 +12,57 @@ if (!KINDROID_AI_ID || !KINDROID_API_KEY) {
     console.error('Please set KINDROID_AI_ID and KINDROID_API_KEY in your .env file');
 }
 
+// Mock endpoint that streams raw text like real Kindroid API
+router.post('/mock-stream', async (req, res) => {
+    console.log('🎭 Mock streaming endpoint called - returning raw text stream');
+    
+    try {
+        const message = req.body.message || "(OOC: Please repeat previous message without altering the story)";
+        console.log('Mock received message:', message);
+        
+        // Set up streaming headers like real Kindroid API
+        res.writeHead(200, {
+            'Content-Type': 'text/plain',
+            'Transfer-Encoding': 'chunked'
+        });
+        
+        // Create mock story content with VN format
+        const mockStory = `LOC: Secluded cove with phosphorescent tide pools
+CHA: Morten/Agreeable, Ava/Relieved
+STP: "Perfect timing." / "Watch the eastern pool." / "Help with the sketch."
+Ava's shoulders relax as she focuses on her sketch, quickly shading the luminous patterns. She points to where the waves crest with brighter intensity. "The concentration's highest there," she murmurs, capping one marker to grab another. Her glow stick bracelet bounces as she works, casting green highlights across the page. The scent of saltwater mixes with her cherry lip balm in the cooling air. You notice how the moonlight catches in her hair as she leans over the paper, completely absorbed in capturing this magical moment.`;
+        
+        let sentLength = 0;
+        
+        // Stream the content gradually with small chunks like real API
+        const chunkSize = 15; // Characters per chunk
+        while (sentLength < mockStory.length) {
+            const chunk = mockStory.slice(sentLength, sentLength + chunkSize);
+            
+            // Stream raw text chunk
+            await new Promise((resolve) => {
+                setTimeout(() => {
+                    res.write(chunk);
+                    resolve();
+                }, 80); // 80ms delay between chunks
+            });
+            
+            sentLength += chunkSize;
+        }
+        
+        console.log('✅ Mock stream completed - sent raw text');
+        res.end();
+        
+    } catch (error) {
+        console.error('Mock stream error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Mock stream error: ' + error.message });
+        } else {
+            res.end();
+        }
+    }
+});
+
 // Endpoint to send message to Kindroid with streaming
 router.post('/send-kindroid-message', async (req, res) => {
     console.log('🚀 Kindroid streaming endpoint called');
@@ -48,29 +99,37 @@ router.post('/send-kindroid-message', async (req, res) => {
         });
         res.flushHeaders(); // Very important!
         
-        if (useMock) {
-            // 2a. Create mock streaming response
-            await createMockStreamingResponse(res, message);
-        } else {
-            // 2b. Start upstream streaming request to real Kindroid API
-            const response = await axios.post(`${KINDROID_API_URL}/send-message`, {
-            ai_id: KINDROID_AI_ID,
-            message: message,
-            stream: true,
-            image_urls: null,
-            image_description: null,
-            video_url: null,
-            video_description: null,
-            internet_response: null,
-            link_url: null,
-            link_description: null
-        }, {
+        // 2. Start upstream streaming request to either mock or real API
+        const apiUrl = useMock ? `http://localhost:${process.env.PORT || 3000}/api/kindroid/mock-stream` : `${KINDROID_API_URL}/send-message`;
+        const requestData = useMock ? 
+            { message } : // Mock endpoint just needs message
+            {             // Real Kindroid API needs full payload
+                ai_id: KINDROID_AI_ID,
+                message: message,
+                stream: true,
+                image_urls: null,
+                image_description: null,
+                video_url: null,
+                video_description: null,
+                internet_response: null,
+                link_url: null,
+                link_description: null
+            };
+        
+        console.log(`Calling ${useMock ? 'mock' : 'real'} API:`, apiUrl);
+        const axiosConfig = {
             headers: {
-                'Authorization': `Bearer ${KINDROID_API_KEY}`,
                 'Content-Type': 'application/json'
             },
             responseType: 'stream'
-        });
+        };
+        
+        // Add authorization header only for real API
+        if (!useMock) {
+            axiosConfig.headers['Authorization'] = `Bearer ${KINDROID_API_KEY}`;
+        }
+        
+        const response = await axios.post(apiUrl, requestData, axiosConfig);
 
         let accumulatedText = '';
         let hasInitialSetup = false;
@@ -137,74 +196,6 @@ router.post('/send-kindroid-message', async (req, res) => {
     }
 });
 
-// Helper function to create mock streaming response
-async function createMockStreamingResponse(res, message) {
-    console.log('🎭 Creating mock streaming response for message:', message);
-    
-    // Create mock story content with VN format
-    const mockStory = `LOC: Secluded cove
-CHA: Morten/Agreeable, Ava/Relieved
-STP: "Perfect timing." / "Watch the eastern pool."
-Ava's shoulders relax as she focuses on her sketch, quickly shading the luminous patterns. She points to where the waves crest with brighter intensity. "The concentration's highest there," she murmurs, capping one marker to grab another. Her glow stick bracelet bounces as she works, casting green highlights across the page. The scent of saltwater mixes with her cherry lip balm in the cooling air. You notice how the moonlight catches in her hair as she leans over the paper, completely absorbed in capturing this magical moment.`;
-    
-    let sentLength = 0;
-    let hasSetupReady = false;
-    let accumulatedText = '';
-    
-    // Helper function to send chunks with delays
-    const sendChunk = (text, isLast = false) => {
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                if (isLast) {
-                    res.write(`data: ${JSON.stringify({ 
-                        type: 'done', 
-                        message: accumulatedText 
-                    })}\n\n`);
-                } else {
-                    res.write(`data: ${JSON.stringify({ 
-                        type: 'chunk', 
-                        message: text 
-                    })}\n\n`);
-                }
-                if (res.flush) res.flush();
-                resolve();
-            }, 100); // 100ms delay between chunks
-        });
-    };
-    
-    // Stream the content gradually
-    const chunkSize = 20; // Characters per chunk
-    while (sentLength < mockStory.length) {
-        const chunk = mockStory.slice(sentLength, sentLength + chunkSize);
-        accumulatedText += chunk;
-        
-        // Check if we should send setup_ready
-        if (!hasSetupReady && hasBasicSetup(accumulatedText)) {
-            hasSetupReady = true;
-            console.log('✅ Mock setup ready detected, sending to client');
-            res.write(`data: ${JSON.stringify({ 
-                type: 'setup_ready', 
-                message: accumulatedText 
-            })}\n\n`);
-            if (res.flush) res.flush();
-        }
-        
-        // Send the chunk
-        if (sentLength + chunkSize >= mockStory.length) {
-            // Last chunk - send as 'done'
-            await sendChunk(chunk, true);
-            break;
-        } else {
-            // Regular chunk
-            await sendChunk(chunk);
-        }
-        
-        sentLength += chunkSize;
-    }
-    
-    console.log('✅ Mock stream completed');
-    res.end();
-}
 
 // Helper function to check if we have basic setup information
 function hasBasicSetup(text) {
