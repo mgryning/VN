@@ -6,8 +6,6 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 require('dotenv').config();
 
-const aiRoutes = require('./routes/ai');
-const storyRoutes = require('./routes/story');
 const assetRoutes = require('./routes/assets');
 const kindroidRoutes = require('./routes/kindroid');
 
@@ -41,8 +39,6 @@ app.use(limiter);
 
 app.use(express.static(path.join(__dirname, '..')));
 
-app.use('/api/ai', aiRoutes);
-app.use('/api/story', storyRoutes);
 app.use('/api/kindroid', kindroidRoutes);
 app.use('/api', assetRoutes);
 
@@ -58,7 +54,6 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'index.html'));
 });
 
-// AI chat endpoint moved to REST API in routes/ai.js
 
 app.use((err, req, res, next) => {
     console.error(err.stack);

@@ -12,63 +12,8 @@ if (!KINDROID_AI_ID || !KINDROID_API_KEY) {
     console.error('Please set KINDROID_AI_ID and KINDROID_API_KEY in your .env file');
 }
 
-// Endpoint to send message to Kindroid AI
-router.post('/send-message', async (req, res) => {
-    try {
-        // Check if credentials are configured
-        if (!KINDROID_AI_ID || !KINDROID_API_KEY) {
-            return res.status(500).json({ error: 'Kindroid AI credentials not configured' });
-        }
-
-        const { message } = req.body;
-        
-        if (!message) {
-            return res.status(400).json({ error: 'Message is required' });
-        }
-
-        // Send message to Kindroid AI
-        const response = await axios.post(`${KINDROID_API_URL}/send-message`, {
-            ai_id: KINDROID_AI_ID,
-            message: message,
-            stream: false,
-            image_urls: null,
-            image_description: null,
-            video_url: null,
-            video_description: null,
-            internet_response: null,
-            link_url: null,
-            link_description: null
-        }, {
-            headers: {
-                'Authorization': `Bearer ${KINDROID_API_KEY}`,
-                'Content-Type': 'application/json'
-            }
-        });
-
-        // Return the AI response
-        res.json({
-            success: true,
-            response: response.data,
-            message: response.data.message || response.data
-        });
-
-    } catch (error) {
-        console.error('Kindroid API error:', error.response?.data || error.message);
-        
-        if (error.response?.status === 401) {
-            res.status(401).json({ error: 'Invalid Kindroid API key' });
-        } else if (error.response?.status === 403) {
-            res.status(403).json({ error: 'Access forbidden - check AI ID and permissions' });
-        } else if (error.response?.status === 400) {
-            res.status(400).json({ error: 'Bad request - check message format' });
-        } else {
-            res.status(500).json({ error: 'Failed to communicate with Kindroid AI' });
-        }
-    }
-});
-
-// Endpoint to repeat previous message with streaming
-router.post('/repeat-previous', async (req, res) => {
+// Endpoint to send message to Kindroid with streaming
+router.post('/send-kindroid-message', async (req, res) => {
     console.log('🚀 Kindroid streaming endpoint called');
     
     try {
@@ -78,7 +23,7 @@ router.post('/repeat-previous', async (req, res) => {
             return res.status(500).json({ error: 'Kindroid AI credentials not configured' });
         }
 
-        const message = "(OOC: Please repeat previous message without altering the story)";
+        const message = req.body.message || "(OOC: Please repeat previous message without altering the story)";
         
         console.log('Sending streaming request to Kindroid with:', {
             ai_id: KINDROID_AI_ID,

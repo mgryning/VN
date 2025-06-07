@@ -53,5 +53,13 @@
     "mood": "reluctant",
     "filename": "ava_reluctant.png",
     "path": "resources/characters/ava_reluctant.png"
+  },
+  {
+    "timestamp": "2025-06-07T18:31:41.427Z",
+    "type": "character",
+    "name": "ava",
+    "mood": "confused",
+    "filename": "ava_confused.png",
+    "path": "resources/characters/ava_confused.png"
   }
 ]

@@ -92,7 +92,7 @@ class KindroidClient {
 
             // Set up fetch with streaming
             const fetchFn = typeof fetch !== 'undefined' ? fetch : require('node-fetch');
-            const response = await fetchFn(`${this.baseURL}/api/kindroid/repeat-previous`, {
+            const response = await fetchFn(`${this.baseURL}/api/kindroid/send-kindroid-message`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -838,7 +838,7 @@ class KindroidClient {
 
             // Send custom message to Kindroid AI
             const fetchFn = typeof fetch !== 'undefined' ? fetch : require('node-fetch');
-            const response = await fetchFn(`${this.baseURL}/api/kindroid/send-message`, {
+            const response = await fetchFn(`${this.baseURL}/api/kindroid/send-kindroid-message`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
